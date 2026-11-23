@@ -1,46 +1,68 @@
 package com.recall.app
 
 import android.Manifest
+import android.animation.ObjectAnimator
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.CompoundButton
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : Activity() {
+
+    private enum class PlayState { IDLE, PLAYING, PAUSED }
+
     private lateinit var prefs: SharedPreferences
-    private lateinit var status: TextView
-    private lateinit var captured: TextView
+
+    private lateinit var statusText: TextView
+    private lateinit var statusDot: View
+    private lateinit var capturedText: TextView
     private lateinit var alwaysSwitch: Switch
-    private lateinit var durationSpinner: Spinner
+    private lateinit var durationBtn: Button
+    private lateinit var recoverBtn: Button
+    private lateinit var playBtn: Button
+    private lateinit var saveBtn: Button
+
     private var player: MediaPlayer? = null
+    private var playState = PlayState.IDLE
+    private var durationIdx = 5
+    private var pulseAnim: ObjectAnimator? = null
 
     private val handler = Handler(Looper.getMainLooper())
     private val refresh: Runnable = object : Runnable {
@@ -73,10 +95,13 @@ class MainActivity : Activity() {
         (value * resources.displayMetrics.density).toInt()
 
     private fun buildUi() {
-        val scroll = ScrollView(this).apply { setBackgroundColor(Color.WHITE) }
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(COLOR_BG)
+            isVerticalScrollBarEnabled = false
+        }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(48), dp(24), dp(32))
+            setPadding(dp(20), dp(56), dp(20), dp(32))
         }
         scroll.addView(
             root,
@@ -86,136 +111,233 @@ class MainActivity : Activity() {
             )
         )
 
+        // Header
         root.addView(TextView(this).apply {
             text = "RECALL"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 32f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 34f)
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(0xFF111827.toInt())
-            setPadding(0, 0, 0, dp(4))
+            setTextColor(COLOR_TEXT)
+            letterSpacing = -0.02f
+            setPadding(0, 0, 0, dp(2))
         })
         root.addView(TextView(this).apply {
-            text = "Always-on audio buffer. Recover any moment you forgot to record."
+            text = "Always-on audio buffer · recover anything you missed"
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            setTextColor(0xFF4B5563.toInt())
+            setTextColor(COLOR_TEXT_MUTED)
             setPadding(0, 0, 0, dp(24))
         })
 
-        status = TextView(this).apply {
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-            setTypeface(typeface, Typeface.BOLD)
+        // Status card
+        val statusCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(Color.TRANSPARENT)
+                setStroke(dp(1), COLOR_DIVIDER)
+                cornerRadius = dp(16).toFloat()
+            }
+            setPadding(dp(18), dp(16), dp(18), dp(18))
+        }
+
+        val statusRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, dp(4))
         }
-        root.addView(status)
-
-        captured = TextView(this).apply {
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            setTextColor(0xFF4B5563.toInt())
-            setPadding(0, 0, 0, dp(24))
+        statusDot = View(this).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(COLOR_STATUS_OFF)
+            }
+            layoutParams = LinearLayout.LayoutParams(dp(10), dp(10)).apply {
+                rightMargin = dp(10)
+            }
         }
-        root.addView(captured)
+        statusRow.addView(statusDot)
+        statusText = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+        }
+        statusRow.addView(statusText)
+        statusCard.addView(statusRow)
+        capturedText = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextColor(COLOR_TEXT_MUTED)
+        }
+        statusCard.addView(capturedText)
+        root.addView(statusCard, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(20) })
 
-        root.addView(divider())
-
+        // Always listening row
         val switchRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(16), 0, dp(8))
+            setPadding(0, dp(4), 0, dp(4))
         }
-        switchRow.addView(TextView(this).apply {
-            text = "Always listening"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(0xFF111827.toInt())
+        switchRow.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
             )
+            addView(TextView(this@MainActivity).apply {
+                text = "Always listening"
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(COLOR_TEXT)
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = "If off, nothing can be recovered."
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                setTextColor(COLOR_TEXT_MUTED)
+                setPadding(0, dp(2), 0, 0)
+            })
         })
-        alwaysSwitch = Switch(this)
+        alwaysSwitch = Switch(this).apply {
+            thumbTintList = ColorStateList.valueOf(COLOR_TEXT)
+            trackTintList = ColorStateList.valueOf(COLOR_DIVIDER)
+        }
         switchRow.addView(alwaysSwitch)
         root.addView(switchRow)
+
+        root.addView(hairline(dp(20), dp(20)))
+
+        // Duration picker
         root.addView(TextView(this).apply {
-            text = "Keeps a rolling 12-hour audio buffer on this device. If you turn this off, you will not be able to recover anything you miss while off."
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            setTextColor(0xFF6B7280.toInt())
-            setPadding(0, 0, 0, dp(16))
+            text = "How far back"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setPadding(0, 0, 0, dp(8))
         })
+        durationBtn = secondaryBtn(presetLabels[durationIdx]) { showDurationPicker() }
+        root.addView(durationBtn)
 
-        root.addView(divider())
+        // Primary action: Recover
+        recoverBtn = primaryBtn("RECOVER AUDIO") { recoverAudio() }
+        root.addView(recoverBtn, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(56)
+        ).apply { topMargin = dp(16) })
 
+        // Playback (state-aware)
+        playBtn = secondaryBtn("PLAY LAST RECOVERY") { togglePlayRecovery() }
+        root.addView(playBtn)
+
+        // Save to device
+        saveBtn = secondaryBtn("SAVE TO DEVICE") { saveRecoveryToDevice() }
+        root.addView(saveBtn)
+
+        // Footer
+        root.addView(hairline(dp(28), dp(16)))
         root.addView(TextView(this).apply {
-            text = "How far back do you want to recover?"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(0xFF111827.toInt())
-            setPadding(0, dp(16), 0, dp(8))
-        })
-
-        durationSpinner = Spinner(this).apply {
-            val adapter = ArrayAdapter(
-                this@MainActivity,
-                android.R.layout.simple_spinner_item,
-                presetLabels
-            )
-            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-            this.adapter = adapter
-            setSelection(5)
-        }
-        root.addView(
-            durationSpinner,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = dp(16) }
-        )
-
-        root.addView(bigButton(
-            "RECOVER AUDIO",
-            0xFF111827.toInt(), Color.WHITE
-        ) { recoverAudio() })
-        root.addView(bigButton(
-            "PLAY LAST RECOVERY",
-            0xFFE5E7EB.toInt(), 0xFF111827.toInt()
-        ) { playRecovered() })
-        root.addView(bigButton(
-            "SAVE RECOVERY TO DEVICE",
-            0xFFE5E7EB.toInt(), 0xFF111827.toInt()
-        ) { saveRecoveryToDevice() })
-
-        root.addView(divider())
-        root.addView(TextView(this).apply {
-            text = "Audio stays on this device. Nothing is uploaded or shared."
+            text = "Audio stays on this device.\nNothing is uploaded or shared."
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            setTextColor(0xFF6B7280.toInt())
-            setPadding(0, dp(16), 0, 0)
+            setTextColor(COLOR_TEXT_MUTED)
             gravity = Gravity.CENTER_HORIZONTAL
+            setLineSpacing(dp(4).toFloat(), 1f)
         })
 
         setContentView(scroll)
 
+        // Switch state + listener
         alwaysSwitch.isChecked = prefs.getBoolean(KEY_ENABLED, true)
         alwaysSwitch.setOnCheckedChangeListener { btn, checked ->
             onSwitchChanged(btn, checked)
         }
+
+        // Entry animation
+        scroll.alpha = 0f
+        scroll.translationY = dp(20).toFloat()
+        scroll.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(450)
+            .setStartDelay(40)
+            .setInterpolator(DecelerateInterpolator())
+            .start()
+
+        updateStatus()
     }
 
-    private fun bigButton(label: String, bg: Int, fg: Int, onClick: () -> Unit): Button =
-        Button(this).apply {
+    private fun primaryBtn(label: String, onClick: () -> Unit): Button {
+        val radius = dp(28).toFloat()
+        val content = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(COLOR_BTN_PRIMARY)
+            cornerRadius = radius
+        }
+        val mask = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(Color.WHITE)
+            cornerRadius = radius
+        }
+        return Button(this).apply {
             text = label
-            setTextColor(fg)
-            setBackgroundColor(bg)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextColor(COLOR_BTN_PRIMARY_FG)
+            background = RippleDrawable(
+                ColorStateList.valueOf(COLOR_BTN_PRIMARY_RIPPLE),
+                content,
+                mask
+            )
+            stateListAnimator = null
+            isAllCaps = true
             setTypeface(typeface, Typeface.BOLD)
+            letterSpacing = 0.04f
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            setOnClickListener { onClick() }
+        }
+    }
+
+    private fun secondaryBtn(label: String, onClick: () -> Unit): Button {
+        val radius = dp(28).toFloat()
+        val content = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(Color.TRANSPARENT)
+            setStroke(dp(1), COLOR_DIVIDER)
+            cornerRadius = radius
+        }
+        val mask = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(Color.WHITE)
+            cornerRadius = radius
+        }
+        return Button(this).apply {
+            text = label
+            setTextColor(COLOR_TEXT)
+            background = RippleDrawable(
+                ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE),
+                content,
+                mask
+            )
+            stateListAnimator = null
+            isAllCaps = true
+            setTypeface(typeface, Typeface.BOLD)
+            letterSpacing = 0.04f
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setOnClickListener { onClick() }
             layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(56)
-            ).apply { topMargin = dp(8) }
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(52)
+            ).apply { topMargin = dp(10) }
         }
+    }
 
-    private fun divider(): View = View(this).apply {
-        setBackgroundColor(0xFFE5E7EB.toInt())
+    private fun hairline(top: Int, bottom: Int): View = View(this).apply {
+        setBackgroundColor(COLOR_DIVIDER)
         layoutParams = LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(1)
-        ).apply { topMargin = dp(8); bottomMargin = dp(8) }
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(1).coerceAtLeast(1)
+        ).apply { topMargin = top; bottomMargin = bottom }
+    }
+
+    private fun showDurationPicker() {
+        AlertDialog.Builder(this)
+            .setTitle("How far back?")
+            .setSingleChoiceItems(presetLabels, durationIdx) { d, which ->
+                durationIdx = which
+                durationBtn.text = presetLabels[which]
+                d.dismiss()
+            }
+            .show()
     }
 
     private fun showDisclosure() {
@@ -259,18 +381,30 @@ class MainActivity : Activity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQ_MIC) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                ensurePermissionsAndStart()
-            } else {
-                Toast.makeText(
-                    this,
-                    "Microphone access is required for RECALL to listen.",
-                    Toast.LENGTH_LONG
-                ).show()
+        when (requestCode) {
+            REQ_MIC -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    ensurePermissionsAndStart()
+                } else {
+                    Toast.makeText(
+                        this,
+                        "Microphone access is required for RECALL to listen.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             }
-        } else if (requestCode == REQ_NOTIF) {
-            ensurePermissionsAndStart()
+            REQ_NOTIF -> ensurePermissionsAndStart()
+            REQ_WRITE -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    saveRecoveryToDevice()
+                } else {
+                    Toast.makeText(
+                        this,
+                        "Storage permission denied, cannot save.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         }
     }
 
@@ -362,14 +496,33 @@ class MainActivity : Activity() {
 
     private fun updateStatus() {
         val enabled = prefs.getBoolean(KEY_ENABLED, true)
-        status.text = when {
-            !enabled -> "Listening is OFF"
-            AudioCaptureService.isRunning -> "Listening · recording in background"
-            else -> "Listening · starting up…"
+        val running = AudioCaptureService.isRunning
+        val text = when {
+            !enabled -> "Listening is off"
+            running -> "Listening"
+            else -> "Starting up…"
         }
-        status.setTextColor(if (enabled) 0xFF059669.toInt() else 0xFF9CA3AF.toInt())
+        statusText.text = text
+        val dotColor = if (enabled && running) COLOR_STATUS_LIVE else COLOR_STATUS_OFF
+        (statusDot.background as? GradientDrawable)?.setColor(dotColor)
+
+        if (enabled && running) {
+            if (pulseAnim == null) {
+                pulseAnim = ObjectAnimator.ofFloat(statusDot, "alpha", 1f, 0.35f, 1f).apply {
+                    duration = 1600
+                    repeatCount = ObjectAnimator.INFINITE
+                    interpolator = AccelerateDecelerateInterpolator()
+                    start()
+                }
+            }
+        } else {
+            pulseAnim?.cancel()
+            pulseAnim = null
+            statusDot.alpha = 1f
+        }
+
         val secs = AudioCaptureService.capturedSeconds(this)
-        captured.text = "Captured so far: ${formatDuration(secs)}"
+        capturedText.text = "Captured so far · ${formatDuration(secs)}"
     }
 
     private fun formatDuration(seconds: Int): String {
@@ -392,8 +545,7 @@ class MainActivity : Activity() {
     }
 
     private fun recoverAudio() {
-        val idx = durationSpinner.selectedItemPosition.coerceAtLeast(0)
-        val wantedSec = presetSeconds[idx]
+        val wantedSec = presetSeconds[durationIdx]
         val availSec = AudioCaptureService.capturedSeconds(this)
         if (availSec <= 0) {
             Toast.makeText(
@@ -416,18 +568,32 @@ class MainActivity : Activity() {
             if (got > 0) {
                 Toast.makeText(
                     this,
-                    "Recovered ${formatDuration(got)}. Ready to play.",
+                    "Recovered ${formatDuration(got)}. Ready to play or save.",
                     Toast.LENGTH_LONG
                 ).show()
+                // Reset playback state so the Play button goes back to IDLE for the new recovery
+                player?.release()
+                player = null
+                playState = PlayState.IDLE
+                updatePlayButton()
             } else {
                 Toast.makeText(this, "Nothing to recover yet.", Toast.LENGTH_LONG).show()
             }
         } catch (e: Exception) {
+            Log.e(TAG, "recovery failed", e)
             Toast.makeText(this, "Recovery failed: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 
-    private fun playRecovered() {
+    private fun togglePlayRecovery() {
+        when (playState) {
+            PlayState.IDLE -> startPlayback()
+            PlayState.PLAYING -> pausePlayback()
+            PlayState.PAUSED -> resumePlayback()
+        }
+    }
+
+    private fun startPlayback() {
         val file = File(getExternalFilesDir(null), "recall-recovery.wav")
         if (!file.exists()) {
             Toast.makeText(this, "Recover audio first.", Toast.LENGTH_SHORT).show()
@@ -448,9 +614,13 @@ class MainActivity : Activity() {
                         "Playback error: $what/$extra",
                         Toast.LENGTH_LONG
                     ).show()
+                    playState = PlayState.IDLE
+                    updatePlayButton()
                     true
                 }
                 setOnCompletionListener {
+                    playState = PlayState.IDLE
+                    updatePlayButton()
                     Toast.makeText(
                         this@MainActivity,
                         "Playback finished.",
@@ -461,66 +631,102 @@ class MainActivity : Activity() {
                 prepare()
                 start()
             }
-            Toast.makeText(
-                this,
-                "Playing recovered audio. Make sure volume is up.",
-                Toast.LENGTH_SHORT
-            ).show()
+            playState = PlayState.PLAYING
+            updatePlayButton()
         } catch (e: Exception) {
-            Log.e(TAG, "playback failed", e)
+            Log.e(TAG, "startPlayback failed", e)
             Toast.makeText(
                 this,
                 "Playback failed: ${e.javaClass.simpleName}: ${e.message}",
                 Toast.LENGTH_LONG
             ).show()
+            playState = PlayState.IDLE
+            updatePlayButton()
+        }
+    }
+
+    private fun pausePlayback() {
+        try {
+            player?.pause()
+            playState = PlayState.PAUSED
+            updatePlayButton()
+        } catch (e: Exception) {
+            Log.e(TAG, "pause failed", e)
+        }
+    }
+
+    private fun resumePlayback() {
+        try {
+            player?.start()
+            playState = PlayState.PLAYING
+            updatePlayButton()
+        } catch (e: Exception) {
+            Log.e(TAG, "resume failed", e)
+        }
+    }
+
+    private fun updatePlayButton() {
+        playBtn.text = when (playState) {
+            PlayState.IDLE -> "PLAY LAST RECOVERY"
+            PlayState.PLAYING -> "PAUSE"
+            PlayState.PAUSED -> "RESUME"
         }
     }
 
     private fun saveRecoveryToDevice() {
-        val file = File(getExternalFilesDir(null), "recall-recovery.wav")
-        if (!file.exists()) {
+        val source = File(getExternalFilesDir(null), "recall-recovery.wav")
+        if (!source.exists()) {
             Toast.makeText(this, "Recover audio first.", Toast.LENGTH_SHORT).show()
             return
         }
-        val timestamp = java.text.SimpleDateFormat(
-            "yyyyMMdd-HHmmss",
-            java.util.Locale.US
-        ).format(java.util.Date())
-        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "audio/wav"
-            putExtra(Intent.EXTRA_TITLE, "RECALL-recovery-$timestamp.wav")
-        }
+        val timestamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+        val filename = "RECALL-recovery-$timestamp.wav"
         try {
-            startActivityForResult(intent, REQ_SAVE)
-        } catch (e: Exception) {
-            Log.e(TAG, "save picker failed", e)
+            if (Build.VERSION.SDK_INT >= 29) {
+                // MediaStore path: writes a real public audio file visible to every app
+                val values = ContentValues().apply {
+                    put(MediaStore.Audio.Media.DISPLAY_NAME, filename)
+                    put(MediaStore.Audio.Media.MIME_TYPE, "audio/wav")
+                    put(MediaStore.Audio.Media.RELATIVE_PATH, "Music/RECALL")
+                    put(MediaStore.Audio.Media.IS_MUSIC, 1)
+                }
+                val uri = contentResolver.insert(
+                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                    values
+                ) ?: throw RuntimeException("MediaStore insert returned null")
+                val out = contentResolver.openOutputStream(uri)
+                    ?: throw RuntimeException("openOutputStream returned null")
+                out.use { o -> source.inputStream().use { it.copyTo(o) } }
+            } else {
+                if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(
+                        arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                        REQ_WRITE
+                    )
+                    return
+                }
+                val dir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
+                    "RECALL"
+                )
+                dir.mkdirs()
+                val dst = File(dir, filename)
+                source.inputStream().use { input ->
+                    dst.outputStream().use { input.copyTo(it) }
+                }
+            }
             Toast.makeText(
                 this,
-                "No file-picker app available on this device.",
+                "Saved to Music/RECALL. Open any audio player and look in Music.",
                 Toast.LENGTH_LONG
             ).show()
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQ_SAVE && resultCode == RESULT_OK) {
-            val uri = data?.data ?: return
-            try {
-                val source = File(getExternalFilesDir(null), "recall-recovery.wav")
-                contentResolver.openOutputStream(uri)?.use { out ->
-                    source.inputStream().use { input -> input.copyTo(out) }
-                }
-                Toast.makeText(this, "Saved.", Toast.LENGTH_LONG).show()
-            } catch (e: Exception) {
-                Log.e(TAG, "save failed", e)
-                Toast.makeText(
-                    this,
-                    "Save failed: ${e.javaClass.simpleName}: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
+        } catch (e: Exception) {
+            Log.e(TAG, "save failed", e)
+            Toast.makeText(
+                this,
+                "Save failed: ${e.javaClass.simpleName}: ${e.message}",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
@@ -535,6 +741,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        pulseAnim?.cancel()
         player?.release()
         super.onDestroy()
     }
@@ -547,6 +754,18 @@ class MainActivity : Activity() {
         const val KEY_ASKED_BATT = "asked_battery_opt"
         const val REQ_MIC = 10
         const val REQ_NOTIF = 11
-        const val REQ_SAVE = 20
+        const val REQ_WRITE = 12
+
+        // X-ish dark palette
+        const val COLOR_BG = 0xFF000000.toInt()
+        const val COLOR_TEXT = 0xFFFFFFFF.toInt()
+        const val COLOR_TEXT_MUTED = 0xFF71767B.toInt()
+        const val COLOR_DIVIDER = 0xFF2F3336.toInt()
+        const val COLOR_STATUS_LIVE = 0xFF00BA7C.toInt()
+        const val COLOR_STATUS_OFF = 0xFF71767B.toInt()
+        const val COLOR_BTN_PRIMARY = 0xFFFFFFFF.toInt()
+        const val COLOR_BTN_PRIMARY_FG = 0xFF000000.toInt()
+        const val COLOR_BTN_PRIMARY_RIPPLE = 0x33000000
+        const val COLOR_BTN_SECONDARY_RIPPLE = 0x33FFFFFF
     }
 }
