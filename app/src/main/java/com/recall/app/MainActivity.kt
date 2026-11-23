@@ -9,6 +9,7 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
+import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
@@ -175,6 +176,10 @@ class MainActivity : Activity() {
             "PLAY LAST RECOVERY",
             0xFFE5E7EB.toInt(), 0xFF111827.toInt()
         ) { playRecovered() })
+        root.addView(bigButton(
+            "SAVE RECOVERY TO DEVICE",
+            0xFFE5E7EB.toInt(), 0xFF111827.toInt()
+        ) { saveRecoveryToDevice() })
 
         root.addView(divider())
         root.addView(TextView(this).apply {
@@ -431,12 +436,91 @@ class MainActivity : Activity() {
         try {
             player?.release()
             player = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                setOnErrorListener { _, what, extra ->
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Playback error: $what/$extra",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    true
+                }
+                setOnCompletionListener {
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Playback finished.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
                 setDataSource(file.absolutePath)
                 prepare()
                 start()
             }
+            Toast.makeText(
+                this,
+                "Playing recovered audio. Make sure volume is up.",
+                Toast.LENGTH_SHORT
+            ).show()
         } catch (e: Exception) {
-            Toast.makeText(this, "Playback failed: ${e.message}", Toast.LENGTH_LONG).show()
+            Log.e(TAG, "playback failed", e)
+            Toast.makeText(
+                this,
+                "Playback failed: ${e.javaClass.simpleName}: ${e.message}",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    private fun saveRecoveryToDevice() {
+        val file = File(getExternalFilesDir(null), "recall-recovery.wav")
+        if (!file.exists()) {
+            Toast.makeText(this, "Recover audio first.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val timestamp = java.text.SimpleDateFormat(
+            "yyyyMMdd-HHmmss",
+            java.util.Locale.US
+        ).format(java.util.Date())
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "audio/wav"
+            putExtra(Intent.EXTRA_TITLE, "RECALL-recovery-$timestamp.wav")
+        }
+        try {
+            startActivityForResult(intent, REQ_SAVE)
+        } catch (e: Exception) {
+            Log.e(TAG, "save picker failed", e)
+            Toast.makeText(
+                this,
+                "No file-picker app available on this device.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQ_SAVE && resultCode == RESULT_OK) {
+            val uri = data?.data ?: return
+            try {
+                val source = File(getExternalFilesDir(null), "recall-recovery.wav")
+                contentResolver.openOutputStream(uri)?.use { out ->
+                    source.inputStream().use { input -> input.copyTo(out) }
+                }
+                Toast.makeText(this, "Saved.", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Log.e(TAG, "save failed", e)
+                Toast.makeText(
+                    this,
+                    "Save failed: ${e.javaClass.simpleName}: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 
@@ -463,5 +547,6 @@ class MainActivity : Activity() {
         const val KEY_ASKED_BATT = "asked_battery_opt"
         const val REQ_MIC = 10
         const val REQ_NOTIF = 11
+        const val REQ_SAVE = 20
     }
 }
