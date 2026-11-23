@@ -35,6 +35,7 @@ import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.CompoundButton
 import android.widget.LinearLayout
+import android.widget.NumberPicker
 import android.widget.ScrollView
 import android.widget.Switch
 import android.widget.TextView
@@ -54,6 +55,7 @@ class MainActivity : Activity() {
     private lateinit var statusDot: View
     private lateinit var capturedText: TextView
     private lateinit var alwaysSwitch: Switch
+    private lateinit var switchStateLabel: TextView
     private lateinit var durationBtn: Button
     private lateinit var recoverBtn: Button
     private lateinit var playBtn: Button
@@ -61,7 +63,7 @@ class MainActivity : Activity() {
 
     private var player: MediaPlayer? = null
     private var playState = PlayState.IDLE
-    private var durationIdx = 5
+    private var durationSec = 60
     private var pulseAnim: ObjectAnimator? = null
 
     private val handler = Handler(Looper.getMainLooper())
@@ -71,14 +73,6 @@ class MainActivity : Activity() {
             handler.postDelayed(this, 5_000)
         }
     }
-
-    private val presetSeconds = intArrayOf(
-        30, 60, 300, 900, 1800, 3600, 7200, 14400, 28800, 43200
-    )
-    private val presetLabels = arrayOf(
-        "30 seconds", "1 minute", "5 minutes", "15 minutes", "30 minutes",
-        "1 hour", "2 hours", "4 hours", "8 hours", "12 hours"
-    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -169,49 +163,73 @@ class MainActivity : Activity() {
         root.addView(statusCard, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = dp(20) })
+        ).apply { bottomMargin = dp(16) })
 
-        // Always listening row
-        val switchRow = LinearLayout(this).apply {
+        // Always listening card — clear ON/OFF badge
+        val switchCard = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(4), 0, dp(4))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(Color.TRANSPARENT)
+                setStroke(dp(1), COLOR_DIVIDER)
+                cornerRadius = dp(16).toFloat()
+            }
+            setPadding(dp(18), dp(14), dp(14), dp(14))
         }
-        switchRow.addView(LinearLayout(this).apply {
+        val switchLabels = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
             )
-            addView(TextView(this@MainActivity).apply {
-                text = "Always listening"
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
-                setTypeface(typeface, Typeface.BOLD)
-                setTextColor(COLOR_TEXT)
-            })
-            addView(TextView(this@MainActivity).apply {
-                text = "If off, nothing can be recovered."
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-                setTextColor(COLOR_TEXT_MUTED)
-                setPadding(0, dp(2), 0, 0)
-            })
-        })
-        alwaysSwitch = Switch(this).apply {
-            thumbTintList = ColorStateList.valueOf(COLOR_TEXT)
-            trackTintList = ColorStateList.valueOf(COLOR_DIVIDER)
         }
-        switchRow.addView(alwaysSwitch)
-        root.addView(switchRow)
+        switchLabels.addView(TextView(this).apply {
+            text = "Always listening"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+        })
+        switchStateLabel = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTypeface(typeface, Typeface.BOLD)
+            letterSpacing = 0.08f
+            setPadding(0, dp(2), 0, 0)
+        }
+        switchLabels.addView(switchStateLabel)
+        switchCard.addView(switchLabels)
 
-        root.addView(hairline(dp(20), dp(20)))
+        alwaysSwitch = Switch(this).apply {
+            thumbTintList = ColorStateList.valueOf(Color.WHITE)
+            trackTintList = ColorStateList(
+                arrayOf(
+                    intArrayOf(android.R.attr.state_checked),
+                    intArrayOf()
+                ),
+                intArrayOf(
+                    COLOR_STATUS_LIVE,
+                    0xFF4A4A4A.toInt()
+                )
+            )
+            scaleX = 1.3f
+            scaleY = 1.3f
+        }
+        switchCard.addView(alwaysSwitch, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { marginStart = dp(12) })
+        root.addView(switchCard, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(20) })
 
-        // Duration picker
+        // Duration section
         root.addView(TextView(this).apply {
             text = "How far back"
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setTextColor(COLOR_TEXT_MUTED)
             setPadding(0, 0, 0, dp(8))
         })
-        durationBtn = secondaryBtn(presetLabels[durationIdx]) { showDurationPicker() }
+        durationBtn = secondaryBtn(formatDuration(durationSec)) { showDurationPicker() }
         root.addView(durationBtn)
 
         // Primary action: Recover
@@ -330,13 +348,79 @@ class MainActivity : Activity() {
     }
 
     private fun showDurationPicker() {
+        val dialogRoot = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(16), dp(16), dp(8))
+        }
+
+        val headers = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        headers.addView(TextView(this).apply {
+            text = "Minutes"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(COLOR_TEXT_MUTED)
+            letterSpacing = 0.08f
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        headers.addView(TextView(this).apply {
+            text = "Seconds"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(COLOR_TEXT_MUTED)
+            letterSpacing = 0.08f
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        dialogRoot.addView(headers)
+
+        val pickers = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, dp(4), 0, 0)
+        }
+        val minutesPicker = NumberPicker(this).apply {
+            minValue = 0
+            maxValue = 720 // up to 12 hours
+            value = (durationSec / 60).coerceIn(0, 720)
+            wrapSelectorWheel = false
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val secondsPicker = NumberPicker(this).apply {
+            minValue = 0
+            maxValue = 59
+            value = (durationSec % 60).coerceIn(0, 59)
+            wrapSelectorWheel = true
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            setFormatter { String.format(Locale.US, "%02d", it) }
+        }
+        pickers.addView(minutesPicker)
+        pickers.addView(secondsPicker)
+        dialogRoot.addView(pickers)
+
+        dialogRoot.addView(TextView(this).apply {
+            text = "Minimum 30 seconds. Maximum 12 hours (buffer size)."
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(COLOR_TEXT_MUTED)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(12), 0, 0)
+        })
+
         AlertDialog.Builder(this)
             .setTitle("How far back?")
-            .setSingleChoiceItems(presetLabels, durationIdx) { d, which ->
-                durationIdx = which
-                durationBtn.text = presetLabels[which]
-                d.dismiss()
+            .setView(dialogRoot)
+            .setPositiveButton("Set") { _, _ ->
+                val total = minutesPicker.value * 60 + secondsPicker.value
+                if (total < 30) {
+                    durationSec = 30
+                    Toast.makeText(this, "Minimum is 30 seconds — set to 30.", Toast.LENGTH_SHORT).show()
+                } else {
+                    durationSec = total.coerceAtMost(12 * 3600)
+                }
+                durationBtn.text = formatDuration(durationSec)
             }
+            .setNegativeButton("Cancel", null)
             .show()
     }
 
@@ -497,12 +581,12 @@ class MainActivity : Activity() {
     private fun updateStatus() {
         val enabled = prefs.getBoolean(KEY_ENABLED, true)
         val running = AudioCaptureService.isRunning
-        val text = when {
+
+        statusText.text = when {
             !enabled -> "Listening is off"
             running -> "Listening"
             else -> "Starting up…"
         }
-        statusText.text = text
         val dotColor = if (enabled && running) COLOR_STATUS_LIVE else COLOR_STATUS_OFF
         (statusDot.background as? GradientDrawable)?.setColor(dotColor)
 
@@ -521,6 +605,11 @@ class MainActivity : Activity() {
             statusDot.alpha = 1f
         }
 
+        switchStateLabel.text = if (enabled) "ON" else "OFF"
+        switchStateLabel.setTextColor(
+            if (enabled) COLOR_STATUS_LIVE else COLOR_TEXT_MUTED
+        )
+
         val secs = AudioCaptureService.capturedSeconds(this)
         capturedText.text = "Captured so far · ${formatDuration(secs)}"
     }
@@ -536,16 +625,16 @@ class MainActivity : Activity() {
             if (sb.isNotEmpty()) sb.append(' ')
             sb.append(m).append(" min")
         }
-        if (h == 0 && s > 0) {
+        if (s > 0 && h == 0) {
             if (sb.isNotEmpty()) sb.append(' ')
             sb.append(s).append(" sec")
         }
-        if (sb.isEmpty()) sb.append(s).append(" sec")
+        if (sb.isEmpty()) sb.append("0 seconds")
         return sb.toString()
     }
 
     private fun recoverAudio() {
-        val wantedSec = presetSeconds[durationIdx]
+        val wantedSec = durationSec
         val availSec = AudioCaptureService.capturedSeconds(this)
         if (availSec <= 0) {
             Toast.makeText(
@@ -571,7 +660,6 @@ class MainActivity : Activity() {
                     "Recovered ${formatDuration(got)}. Ready to play or save.",
                     Toast.LENGTH_LONG
                 ).show()
-                // Reset playback state so the Play button goes back to IDLE for the new recovery
                 player?.release()
                 player = null
                 playState = PlayState.IDLE
@@ -681,9 +769,9 @@ class MainActivity : Activity() {
         }
         val timestamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
         val filename = "RECALL-recovery-$timestamp.wav"
+        var savedUri: Uri? = null
         try {
             if (Build.VERSION.SDK_INT >= 29) {
-                // MediaStore path: writes a real public audio file visible to every app
                 val values = ContentValues().apply {
                     put(MediaStore.Audio.Media.DISPLAY_NAME, filename)
                     put(MediaStore.Audio.Media.MIME_TYPE, "audio/wav")
@@ -694,6 +782,7 @@ class MainActivity : Activity() {
                     MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                     values
                 ) ?: throw RuntimeException("MediaStore insert returned null")
+                savedUri = uri
                 val out = contentResolver.openOutputStream(uri)
                     ?: throw RuntimeException("openOutputStream returned null")
                 out.use { o -> source.inputStream().use { it.copyTo(o) } }
@@ -714,12 +803,8 @@ class MainActivity : Activity() {
                 source.inputStream().use { input ->
                     dst.outputStream().use { input.copyTo(it) }
                 }
+                savedUri = Uri.fromFile(dst)
             }
-            Toast.makeText(
-                this,
-                "Saved to Music/RECALL. Open any audio player and look in Music.",
-                Toast.LENGTH_LONG
-            ).show()
         } catch (e: Exception) {
             Log.e(TAG, "save failed", e)
             Toast.makeText(
@@ -727,6 +812,32 @@ class MainActivity : Activity() {
                 "Save failed: ${e.javaClass.simpleName}: ${e.message}",
                 Toast.LENGTH_LONG
             ).show()
+            return
+        }
+
+        Toast.makeText(
+            this,
+            "Saved to Music/RECALL. Opening…",
+            Toast.LENGTH_SHORT
+        ).show()
+
+        // Launch the user's default audio player directly. First time they'll see
+        // the system "Open with" chooser — picking any player + tapping "Always"
+        // sets it as default, and every future save opens straight in that app.
+        savedUri?.let { uri ->
+            val playIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "audio/wav")
+                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            }
+            try {
+                startActivity(playIntent)
+            } catch (_: Exception) {
+                Toast.makeText(
+                    this,
+                    "File saved to Music/RECALL. Open any audio app to play it.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
 
@@ -756,7 +867,6 @@ class MainActivity : Activity() {
         const val REQ_NOTIF = 11
         const val REQ_WRITE = 12
 
-        // X-ish dark palette
         const val COLOR_BG = 0xFF000000.toInt()
         const val COLOR_TEXT = 0xFFFFFFFF.toInt()
         const val COLOR_TEXT_MUTED = 0xFF71767B.toInt()
