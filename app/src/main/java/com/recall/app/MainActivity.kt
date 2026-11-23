@@ -17,6 +17,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
+import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -330,15 +331,28 @@ class MainActivity : Activity() {
     }
 
     private fun startCaptureService() {
-        val intent = Intent(this, AudioCaptureService::class.java)
-            .setAction(AudioCaptureService.ACTION_START)
-        startForegroundService(intent)
+        try {
+            val intent = Intent(this, AudioCaptureService::class.java)
+                .setAction(AudioCaptureService.ACTION_START)
+            startForegroundService(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "startForegroundService failed", e)
+            Toast.makeText(
+                this,
+                "Could not start listening: ${e.javaClass.simpleName}: ${e.message}",
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     private fun stopCaptureService() {
-        val intent = Intent(this, AudioCaptureService::class.java)
-            .setAction(AudioCaptureService.ACTION_STOP)
-        startService(intent)
+        try {
+            val intent = Intent(this, AudioCaptureService::class.java)
+                .setAction(AudioCaptureService.ACTION_STOP)
+            startService(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "stopService failed", e)
+        }
     }
 
     private fun updateStatus() {
@@ -442,6 +456,7 @@ class MainActivity : Activity() {
     }
 
     companion object {
+        private const val TAG = "RecallActivity"
         const val PREFS = "recall_prefs"
         const val KEY_TERMS = "accepted_terms"
         const val KEY_ENABLED = "enabled"

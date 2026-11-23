@@ -7,10 +7,13 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import java.io.File
 import java.io.RandomAccessFile
 import kotlin.concurrent.thread
@@ -31,7 +34,21 @@ class AudioCaptureService : Service() {
     private fun startCapture() {
         if (recording) return
         createChannel()
-        startForeground(NOTIFICATION_ID, buildNotification())
+        try {
+            if (Build.VERSION.SDK_INT >= 30) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    buildNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, buildNotification())
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground failed", e)
+            stopSelf()
+            return
+        }
 
         val saved = getSharedPreferences(PREFS, MODE_PRIVATE)
         val lastCapacity = saved.getInt("capacity", 0)
@@ -72,9 +89,9 @@ class AudioCaptureService : Service() {
             try {
                 val ring = File(filesDir, RING_FILE)
                 RandomAccessFile(ring, "rw").use { file ->
-                    if (file.length() != CAPACITY_BYTES.toLong()) {
-                        file.setLength(CAPACITY_BYTES.toLong())
-                    }
+                    // No upfront setLength: the file grows naturally as writePosition advances
+                    // and stays at CAPACITY_BYTES once the ring has wrapped. Avoids a 1.38 GB
+                    // allocation on first start that can stall or fail on low-storage devices.
                     val buffer = ByteArray(CHUNK_BYTES)
                     var flushTicks = 0
                     while (recording) {
@@ -100,7 +117,8 @@ class AudioCaptureService : Service() {
                         }
                     }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.e(TAG, "capture loop crashed", e)
                 recording = false
                 isRunning = false
             }
@@ -159,6 +177,7 @@ class AudioCaptureService : Service() {
         const val ACTION_START = "com.recall.app.START"
         const val ACTION_STOP = "com.recall.app.STOP"
 
+        private const val TAG = "RecallService"
         private const val CHANNEL_ID = "recall_recording"
         private const val NOTIFICATION_ID = 41
         private const val SAMPLE_RATE = 16000
@@ -200,7 +219,11 @@ class AudioCaptureService : Service() {
             if (bytesCaptured == 0) return 0
             val actual = minOf(wanted, bytesCaptured)
             val ring = File(context.filesDir, RING_FILE)
-            if (!ring.exists() || ring.length() < CAPACITY_BYTES) return 0
+            if (!ring.exists()) return 0
+            // With lazy growth, the file is only >= bytesCaptured in size. Reads beyond
+            // that would be invalid, but we never issue them: `actual <= bytesCaptured`,
+            // and the start point is computed modulo CAPACITY_BYTES so wrap-reads only
+            // trigger once the ring has filled, by which point file.length() == CAPACITY_BYTES.
             val start = (writePosition - actual).mod(CAPACITY_BYTES)
             val pcm = ByteArray(actual)
             RandomAccessFile(ring, "r").use { file ->
