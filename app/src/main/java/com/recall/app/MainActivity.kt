@@ -60,6 +60,9 @@ class MainActivity : Activity() {
     private lateinit var recoverBtn: Button
     private lateinit var playBtn: Button
     private lateinit var saveBtn: Button
+    private lateinit var balanceBigText: TextView
+    private lateinit var balanceSubText: TextView
+    private lateinit var buyBtn: Button
 
     private var player: MediaPlayer? = null
     private var playState = PlayState.IDLE
@@ -77,7 +80,9 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        Billing.ensureInit(this)
         buildUi()
+        updateBalance()
         if (!prefs.getBoolean(KEY_TERMS, false)) {
             showDisclosure()
         } else {
@@ -120,6 +125,63 @@ class MainActivity : Activity() {
             setTextColor(COLOR_TEXT_MUTED)
             setPadding(0, 0, 0, dp(24))
         })
+
+        // Balance card
+        val balanceCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(0xFF0A1A2A.toInt(), 0xFF000000.toInt())
+            ).apply {
+                shape = GradientDrawable.RECTANGLE
+                setStroke(dp(1), COLOR_ACCENT_DIM)
+                cornerRadius = dp(16).toFloat()
+            }
+            setPadding(dp(18), dp(14), dp(14), dp(14))
+        }
+        balanceCard.addView(TextView(this).apply {
+            text = "YOUR BALANCE"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT_MUTED)
+            letterSpacing = 0.14f
+            setPadding(0, 0, 0, dp(6))
+        })
+        val balanceRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val balanceCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+            )
+        }
+        balanceBigText = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+            letterSpacing = -0.02f
+        }
+        balanceCol.addView(balanceBigText)
+        balanceSubText = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setPadding(0, dp(2), 0, 0)
+        }
+        balanceCol.addView(balanceSubText)
+        balanceRow.addView(balanceCol)
+
+        buyBtn = accentBtn("BUY MINUTES") { showPackPicker() }
+        balanceRow.addView(buyBtn, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, dp(42)
+        ).apply { marginStart = dp(12) })
+        balanceCard.addView(balanceRow)
+
+        root.addView(balanceCard, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(16) })
 
         // Status card
         val statusCard = LinearLayout(this).apply {
@@ -340,6 +402,38 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun accentBtn(label: String, onClick: () -> Unit): Button {
+        val radius = dp(21).toFloat()
+        val content = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(COLOR_ACCENT)
+            cornerRadius = radius
+        }
+        val mask = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(Color.WHITE)
+            cornerRadius = radius
+        }
+        return Button(this).apply {
+            text = label
+            setTextColor(Color.WHITE)
+            background = RippleDrawable(
+                ColorStateList.valueOf(COLOR_ACCENT_RIPPLE),
+                content,
+                mask
+            )
+            stateListAnimator = null
+            isAllCaps = true
+            setTypeface(typeface, Typeface.BOLD)
+            letterSpacing = 0.06f
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setPadding(dp(14), 0, dp(14), 0)
+            minWidth = 0
+            minimumWidth = 0
+            setOnClickListener { onClick() }
+        }
+    }
+
     private fun hairline(top: Int, bottom: Int): View = View(this).apply {
         setBackgroundColor(COLOR_DIVIDER)
         layoutParams = LinearLayout.LayoutParams(
@@ -426,13 +520,23 @@ class MainActivity : Activity() {
 
     private fun showDisclosure() {
         AlertDialog.Builder(this)
-            .setTitle("Before you start")
+            .setTitle("Microphone access")
             .setMessage(
-                "RECALL continuously records audio in your surroundings while listening is ON.\n\n" +
-                "All audio stays on your device only. Nothing is uploaded, shared, or sent anywhere.\n\n" +
-                "You are responsible for complying with recording laws in your location. In some places, recording a conversation without everyone's consent is illegal."
+                "RECALL continuously captures audio from your microphone while listening is ON. " +
+                "This powers the recovery feature — the ability to get back the last up-to-12 hours " +
+                "of ambient sound.\n\n" +
+                "HOW YOUR AUDIO IS HANDLED\n" +
+                "• Stored only on this device, in RECALL's private app storage\n" +
+                "• Overwritten automatically every 12 hours (rolling buffer)\n" +
+                "• Never uploaded, transmitted, or shared with anyone\n" +
+                "• Deleted entirely when you uninstall the app\n\n" +
+                "YOUR RESPONSIBILITY\n" +
+                "Audio-recording laws vary by region. In many places it is illegal to record a " +
+                "conversation without the consent of every participant. You are solely responsible " +
+                "for complying with the laws that apply to you.\n\n" +
+                "By tapping Agree & Continue you accept the Privacy Policy and Terms of Service."
             )
-            .setPositiveButton("I understand") { _, _ ->
+            .setPositiveButton("Agree & Continue") { _, _ ->
                 prefs.edit().putBoolean(KEY_TERMS, true).apply()
                 ensurePermissionsAndStart()
             }
@@ -614,6 +718,116 @@ class MainActivity : Activity() {
         capturedText.text = "Captured so far · ${formatDuration(secs)}"
     }
 
+    private fun updateBalance() {
+        val trial = Billing.trialRemainingSec(this)
+        val paid = Billing.paidBalanceSec(this)
+        val total = trial + paid
+        val m = total / 60
+        val s = total % 60
+        balanceBigText.text = String.format(Locale.US, "%d min %02d sec", m, s)
+        balanceBigText.setTextColor(
+            if (total == 0) 0xFFFF6B6B.toInt() else COLOR_TEXT
+        )
+        balanceSubText.text = when {
+            trial > 0 && paid == 0 -> "Free trial · ${trial} sec included"
+            trial > 0 && paid > 0 -> "Trial ${trial}s + Paid ${paid / 60}m ${paid % 60}s"
+            trial == 0 && paid > 0 -> "Paid balance · ${paid / 60} min ${paid % 60} sec"
+            else -> "No minutes left — tap BUY MINUTES"
+        }
+    }
+
+    private fun showPackPicker() {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+        }
+        container.addView(TextView(this).apply {
+            text = "Demo mode — tapping a pack simulates a purchase and credits your account instantly. Google Play billing will be wired in before public launch."
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setPadding(0, 0, 0, dp(14))
+            setLineSpacing(dp(2).toFloat(), 1f)
+        })
+
+        var dialogRef: AlertDialog? = null
+
+        for (pack in Billing.PACKS) {
+            val highlightColor = if (pack.highlight) COLOR_ACCENT else COLOR_DIVIDER
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                background = RippleDrawable(
+                    ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE),
+                    GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        setColor(Color.TRANSPARENT)
+                        setStroke(dp(if (pack.highlight) 2 else 1), highlightColor)
+                        cornerRadius = dp(14).toFloat()
+                    },
+                    GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        setColor(Color.WHITE)
+                        cornerRadius = dp(14).toFloat()
+                    }
+                )
+                setPadding(dp(16), dp(14), dp(16), dp(14))
+                isClickable = true
+                isFocusable = true
+            }
+            val leftCol = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+                )
+            }
+            leftCol.addView(TextView(this).apply {
+                text = "${pack.minutes} minutes"
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(COLOR_TEXT)
+            })
+            pack.badge?.let {
+                leftCol.addView(TextView(this).apply {
+                    text = it.uppercase(Locale.US)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
+                    setTypeface(typeface, Typeface.BOLD)
+                    setTextColor(if (pack.highlight) COLOR_ACCENT else COLOR_STATUS_LIVE)
+                    letterSpacing = 0.12f
+                    setPadding(0, dp(2), 0, 0)
+                })
+            }
+            row.addView(leftCol)
+            row.addView(TextView(this).apply {
+                text = pack.priceUsd
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(COLOR_TEXT)
+            })
+            row.setOnClickListener {
+                Billing.addMinutes(this, pack.minutes)
+                updateBalance()
+                Toast.makeText(
+                    this,
+                    "+${pack.minutes} minutes added (demo).",
+                    Toast.LENGTH_SHORT
+                ).show()
+                dialogRef?.dismiss()
+            }
+            container.addView(row, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(10) })
+        }
+
+        val scroll = ScrollView(this).apply { addView(container) }
+        dialogRef = AlertDialog.Builder(this)
+            .setTitle("Buy minutes")
+            .setView(scroll)
+            .setNegativeButton("Close", null)
+            .create()
+        dialogRef.show()
+    }
+
     private fun formatDuration(seconds: Int): String {
         if (seconds <= 0) return "0 seconds"
         val h = seconds / 3600
@@ -644,6 +858,17 @@ class MainActivity : Activity() {
             ).show()
             return
         }
+        val need = minOf(wantedSec, availSec)
+        if (!Billing.canCover(this, need)) {
+            val have = Billing.effectiveSec(this)
+            Toast.makeText(
+                this,
+                "Need ${formatDuration(need)} of minutes — you have ${formatDuration(have)}. Top up to continue.",
+                Toast.LENGTH_LONG
+            ).show()
+            showPackPicker()
+            return
+        }
         if (availSec < wantedSec) {
             Toast.makeText(
                 this,
@@ -655,9 +880,11 @@ class MainActivity : Activity() {
             val out = File(getExternalFilesDir(null), "recall-recovery.wav")
             val got = AudioCaptureService.exportLastSeconds(this, wantedSec, out)
             if (got > 0) {
+                Billing.deduct(this, got)
+                updateBalance()
                 Toast.makeText(
                     this,
-                    "Recovered ${formatDuration(got)}. Ready to play or save.",
+                    "Recovered ${formatDuration(got)} — ${formatDuration(got)} deducted. Ready to play or save.",
                     Toast.LENGTH_LONG
                 ).show()
                 player?.release()
@@ -877,5 +1104,8 @@ class MainActivity : Activity() {
         const val COLOR_BTN_PRIMARY_FG = 0xFF000000.toInt()
         const val COLOR_BTN_PRIMARY_RIPPLE = 0x33000000
         const val COLOR_BTN_SECONDARY_RIPPLE = 0x33FFFFFF
+        const val COLOR_ACCENT = 0xFF1D9BF0.toInt()
+        const val COLOR_ACCENT_DIM = 0xFF1A4766.toInt()
+        const val COLOR_ACCENT_RIPPLE = 0x33FFFFFF
     }
 }
