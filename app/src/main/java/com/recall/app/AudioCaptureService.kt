@@ -142,9 +142,16 @@ class AudioCaptureService : Service() {
 
     private fun createChannel() {
         val channel = NotificationChannel(
-            CHANNEL_ID, "RECALL recording",
-            NotificationManager.IMPORTANCE_LOW
-        )
+            CHANNEL_ID, "RECALL",
+            NotificationManager.IMPORTANCE_MIN
+        ).apply {
+            description = "Background service"
+            setShowBadge(false)
+            lockscreenVisibility = Notification.VISIBILITY_SECRET
+            enableLights(false)
+            enableVibration(false)
+            setSound(null, null)
+        }
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
@@ -157,11 +164,13 @@ class AudioCaptureService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("RECALL is listening")
-            .setContentText("Tap to open the app.")
-            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setContentTitle("RECALL")
+            .setSmallIcon(R.drawable.ic_notification_transparent)
             .setContentIntent(pending)
             .setOngoing(true)
+            .setShowWhen(false)
+            .setVisibility(Notification.VISIBILITY_SECRET)
+            .setPriority(Notification.PRIORITY_MIN)
             .build()
     }
 
