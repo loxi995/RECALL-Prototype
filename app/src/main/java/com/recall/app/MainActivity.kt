@@ -67,6 +67,8 @@ class MainActivity : Activity() {
     private lateinit var balanceBigText: TextView
     private lateinit var balanceSubText: TextView
     private lateinit var buyBtn: Button
+    private lateinit var bufferTitleText: TextView
+    private lateinit var bufferSubText: TextView
 
     private var player: MediaPlayer? = null
     private var playState = PlayState.IDLE
@@ -87,6 +89,7 @@ class MainActivity : Activity() {
         Billing.ensureInit(this)
         buildUi()
         updateBalance()
+        updateBuffer()
         if (!prefs.getBoolean(KEY_TERMS, false)) {
             showDisclosure()
         } else {
@@ -283,6 +286,61 @@ class MainActivity : Activity() {
             ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply { marginStart = dp(12) })
         root.addView(switchCard, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(16) })
+
+        // Buffer window card — how far back the service keeps audio on the device
+        val bufferCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(Color.TRANSPARENT)
+                setStroke(dp(1), COLOR_DIVIDER)
+                cornerRadius = dp(16).toFloat()
+            }
+            setPadding(dp(18), dp(14), dp(14), dp(14))
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { showBufferTierPicker() }
+        }
+        val bufferCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+            )
+        }
+        bufferCol.addView(TextView(this).apply {
+            text = "BUFFER WINDOW"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT_MUTED)
+            letterSpacing = 0.14f
+            setPadding(0, 0, 0, dp(4))
+        })
+        bufferTitleText = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+        }
+        bufferCol.addView(bufferTitleText)
+        bufferSubText = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setPadding(0, dp(2), 0, 0)
+        }
+        bufferCol.addView(bufferSubText)
+        bufferCard.addView(bufferCol)
+        bufferCard.addView(TextView(this).apply {
+            text = "EXTEND ▸"
+            setTextColor(COLOR_ACCENT)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            letterSpacing = 0.14f
+            setPadding(dp(10), 0, dp(2), 0)
+        })
+        root.addView(bufferCard, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply { bottomMargin = dp(20) })
@@ -598,10 +656,12 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
             setPadding(0, dp(4), 0, 0)
         }
+        val bufferHrs = AudioCaptureService.bufferHours(this)
+        val maxMinutes = bufferHrs * 60
         val minutesPicker = NumberPicker(this).apply {
             minValue = 0
-            maxValue = 720 // up to 12 hours
-            value = (durationSec / 60).coerceIn(0, 720)
+            maxValue = maxMinutes
+            value = (durationSec / 60).coerceIn(0, maxMinutes)
             wrapSelectorWheel = false
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         }
@@ -618,7 +678,7 @@ class MainActivity : Activity() {
         dialogRoot.addView(pickers)
 
         dialogRoot.addView(TextView(this).apply {
-            text = "Minimum 30 seconds. Maximum 12 hours (buffer size)."
+            text = "Minimum 30 seconds. Maximum ${formatBufferHours(bufferHrs)} (buffer window)."
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(COLOR_TEXT_MUTED)
             gravity = Gravity.CENTER
@@ -642,7 +702,7 @@ class MainActivity : Activity() {
                     durationSec = 30
                     Toast.makeText(this, "Minimum is 30 seconds — set to 30.", Toast.LENGTH_SHORT).show()
                 } else {
-                    durationSec = total.coerceAtMost(12 * 3600)
+                    durationSec = total.coerceAtMost(AudioCaptureService.bufferHours(this) * 3600)
                 }
                 durationBtn.text = formatDuration(durationSec)
             }
@@ -903,6 +963,156 @@ class MainActivity : Activity() {
             trial == 0 && paid > 0 -> "Paid balance · ${paid / 60} min ${paid % 60} sec"
             else -> "No minutes left — tap BUY MINUTES"
         }
+    }
+
+    private fun updateBuffer() {
+        val hours = AudioCaptureService.bufferHours(this)
+        bufferTitleText.text = formatBufferHours(hours)
+        val tier = Billing.BUFFER_TIERS.find { it.hours == hours }
+        bufferSubText.text = when {
+            tier == null -> "Custom window · tap to change"
+            tier.hours == Billing.BUFFER_TIERS[0].hours -> "Default · tap to extend further"
+            else -> "Extended · tap to change"
+        }
+    }
+
+    private fun formatBufferHours(hours: Int): String = when {
+        hours >= 24 && hours % 24 == 0 -> {
+            val days = hours / 24
+            if (days == 1) "1 day of audio" else "$days days of audio"
+        }
+        else -> if (hours == 1) "1 hour of audio" else "$hours hours of audio"
+    }
+
+    private fun showBufferTierPicker() {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(22), dp(20), dp(16))
+        }
+        container.addView(TextView(this).apply {
+            text = "EXTEND BUFFER"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+            letterSpacing = 0.1f
+            setPadding(0, 0, 0, dp(4))
+        })
+        container.addView(TextView(this).apply {
+            text = "How far back should RECALL keep audio on this device? Demo mode — tapping a tier unlocks it instantly."
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setPadding(0, 0, 0, dp(16))
+            setLineSpacing(dp(2).toFloat(), 1f)
+        })
+
+        var dialogRef: Dialog? = null
+        val currentHours = AudioCaptureService.bufferHours(this)
+
+        for (tier in Billing.BUFFER_TIERS) {
+            val isCurrent = tier.hours == currentHours
+            val strokeColor = when {
+                isCurrent -> COLOR_STATUS_LIVE
+                tier.highlight -> COLOR_ACCENT
+                else -> COLOR_DIVIDER
+            }
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                background = RippleDrawable(
+                    ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE),
+                    GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        setColor(Color.TRANSPARENT)
+                        setStroke(dp(if (isCurrent || tier.highlight) 2 else 1), strokeColor)
+                        cornerRadius = dp(14).toFloat()
+                    },
+                    GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        setColor(Color.WHITE)
+                        cornerRadius = dp(14).toFloat()
+                    }
+                )
+                setPadding(dp(16), dp(14), dp(16), dp(14))
+                isClickable = true
+                isFocusable = true
+            }
+            val leftCol = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+                )
+            }
+            leftCol.addView(TextView(this).apply {
+                text = tier.label
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(COLOR_TEXT)
+            })
+            tier.badge?.let {
+                leftCol.addView(TextView(this).apply {
+                    text = if (isCurrent) "ACTIVE" else it.uppercase(Locale.US)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
+                    setTypeface(typeface, Typeface.BOLD)
+                    setTextColor(
+                        when {
+                            isCurrent -> COLOR_STATUS_LIVE
+                            tier.highlight -> COLOR_ACCENT
+                            else -> COLOR_TEXT_MUTED
+                        }
+                    )
+                    letterSpacing = 0.12f
+                    setPadding(0, dp(2), 0, 0)
+                })
+            }
+            row.addView(leftCol)
+            row.addView(TextView(this).apply {
+                text = tier.priceUsd
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(COLOR_TEXT)
+            })
+            row.setOnClickListener {
+                if (tier.hours != currentHours) {
+                    AudioCaptureService.setBufferHours(this, tier.hours)
+                    updateBuffer()
+                    Toast.makeText(
+                        this,
+                        "Buffer extended to ${formatBufferHours(tier.hours)}.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                dialogRef?.dismiss()
+            }
+            container.addView(row, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(10) })
+        }
+
+        val closeRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+            setPadding(0, dp(6), 0, 0)
+        }
+        closeRow.addView(TextView(this).apply {
+            text = "CLOSE"
+            setTextColor(COLOR_ACCENT)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            letterSpacing = 0.14f
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            isClickable = true
+            isFocusable = true
+            background = RippleDrawable(
+                ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE), null, null
+            )
+            setOnClickListener { dialogRef?.dismiss() }
+        })
+        container.addView(closeRow)
+
+        val scroll = ScrollView(this).apply { addView(container) }
+        dialogRef = styledDialog(scroll)
+        dialogRef.show()
     }
 
     private fun showPackPicker() {

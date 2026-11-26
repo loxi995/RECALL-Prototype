@@ -9,10 +9,10 @@ android {
 
     defaultConfig {
         applicationId = "com.recall.app"
-        minSdk = 26
+        minSdk = 29
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.2.1"
+        versionCode = 14
+        versionName = "1.3.0"
     }
 
     signingConfigs {

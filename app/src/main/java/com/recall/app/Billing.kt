@@ -41,6 +41,27 @@ object Billing {
         Pack("recall_minutes_600", 600, "$19.99", "Best Deal"),
     )
 
+    /**
+     * Buffer-window upgrade tiers. The 24-hour tier is free and the default.
+     * Higher tiers are one-time unlocks — purchase extends the rolling buffer
+     * window the service holds on the device.
+     */
+    data class BufferTier(
+        val productId: String,
+        val hours: Int,
+        val priceUsd: String,  // "Included" for the free tier
+        val label: String,
+        val badge: String? = null,
+        val highlight: Boolean = false,
+    )
+
+    val BUFFER_TIERS: List<BufferTier> = listOf(
+        BufferTier("recall_buffer_24h",  24,  "Included", "24 hours",  "DEFAULT"),
+        BufferTier("recall_buffer_48h",  48,  "$4.99",    "2 days",    "+1 day"),
+        BufferTier("recall_buffer_72h",  72,  "$9.99",    "3 days",    "MOST POPULAR", highlight = true),
+        BufferTier("recall_buffer_168h", 168, "$19.99",   "7 days",    "POWER USER"),
+    )
+
     private fun prefs(c: Context): SharedPreferences =
         c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
