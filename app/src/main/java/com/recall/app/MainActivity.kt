@@ -4,6 +4,7 @@ import android.Manifest
 import android.animation.ObjectAnimator
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.Dialog
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -30,10 +31,13 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.Window
+import android.view.WindowManager
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.CompoundButton
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.NumberPicker
 import android.widget.ScrollView
@@ -172,11 +176,10 @@ class MainActivity : Activity() {
         balanceCol.addView(balanceSubText)
         balanceRow.addView(balanceCol)
 
-        buyBtn = accentBtn("BUY MINUTES") { showPackPicker() }
-        balanceRow.addView(buyBtn, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT, dp(42)
-        ).apply { marginStart = dp(12) })
         balanceCard.addView(balanceRow)
+        balanceCard.isClickable = true
+        balanceCard.isFocusable = true
+        balanceCard.setOnClickListener { showPackPicker() }
 
         root.addView(balanceCard, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -318,7 +321,28 @@ class MainActivity : Activity() {
             setLineSpacing(dp(4).toFloat(), 1f)
         })
 
-        setContentView(scroll)
+        // Floating top-right BUY MINUTES pill (neon-stroked, pinned above scroll)
+        val rootFrame = FrameLayout(this).apply { setBackgroundColor(COLOR_BG) }
+        rootFrame.addView(
+            scroll,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+        buyBtn = buyPill { showPackPicker() }
+        rootFrame.addView(
+            buyBtn,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(40)
+            ).apply {
+                gravity = Gravity.TOP or Gravity.END
+                topMargin = dp(52)
+                rightMargin = dp(20)
+            }
+        )
+        setContentView(rootFrame)
 
         // Switch state + listener
         alwaysSwitch.isChecked = prefs.getBoolean(KEY_ENABLED, true)
@@ -334,6 +358,13 @@ class MainActivity : Activity() {
             .translationY(0f)
             .setDuration(450)
             .setStartDelay(40)
+            .setInterpolator(DecelerateInterpolator())
+            .start()
+        buyBtn.alpha = 0f
+        buyBtn.animate()
+            .alpha(1f)
+            .setStartDelay(260)
+            .setDuration(300)
             .setInterpolator(DecelerateInterpolator())
             .start()
 
@@ -434,6 +465,99 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Floating top-right neon-stroked BUY MINUTES pill. */
+    private fun buyPill(onClick: () -> Unit): Button {
+        val radius = dp(12).toFloat()
+        val content = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(0xCC000000.toInt())
+            setStroke(dp(2), COLOR_ACCENT)
+            cornerRadius = radius
+        }
+        val mask = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(Color.WHITE)
+            cornerRadius = radius
+        }
+        return Button(this).apply {
+            text = "+ BUY MIN"
+            setTextColor(COLOR_ACCENT)
+            background = RippleDrawable(
+                ColorStateList.valueOf(COLOR_ACCENT_RIPPLE),
+                content,
+                mask
+            )
+            stateListAnimator = null
+            isAllCaps = true
+            setTypeface(typeface, Typeface.BOLD)
+            letterSpacing = 0.14f
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setPadding(dp(12), 0, dp(12), 0)
+            minWidth = 0
+            minimumWidth = 0
+            setOnClickListener { onClick() }
+        }
+    }
+
+    /** Dialog with dark rounded card background + window blur behind (API 31+). */
+    private fun styledDialog(contentView: View): Dialog {
+        val dlg = Dialog(this)
+        dlg.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dlg.setContentView(contentView)
+        dlg.window?.let { w ->
+            w.setBackgroundDrawable(GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(0xF2000000.toInt())
+                setStroke(dp(1), COLOR_DIVIDER)
+                cornerRadius = dp(22).toFloat()
+            })
+            val lp = w.attributes
+            lp.width = (resources.displayMetrics.widthPixels * 0.9f).toInt()
+            w.attributes = lp
+            w.setDimAmount(0.7f)
+            if (Build.VERSION.SDK_INT >= 31) {
+                w.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                val attrs = w.attributes
+                try {
+                    val f = WindowManager.LayoutParams::class.java.getField("blurBehindRadius")
+                    f.setInt(attrs, 40)
+                    w.attributes = attrs
+                } catch (_: Exception) { /* feature not available on this build */ }
+            }
+        }
+        return dlg
+    }
+
+    /** Red destructive button for confirm-off style dialogs. */
+    private fun dangerBtn(label: String, onClick: () -> Unit): Button {
+        val radius = dp(24).toFloat()
+        val content = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(0xFFE0245E.toInt())
+            cornerRadius = radius
+        }
+        val mask = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(Color.WHITE)
+            cornerRadius = radius
+        }
+        return Button(this).apply {
+            text = label
+            setTextColor(Color.WHITE)
+            background = RippleDrawable(
+                ColorStateList.valueOf(0x33FFFFFF),
+                content,
+                mask
+            )
+            stateListAnimator = null
+            isAllCaps = true
+            setTypeface(typeface, Typeface.BOLD)
+            letterSpacing = 0.04f
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setOnClickListener { onClick() }
+        }
+    }
+
     private fun hairline(top: Int, bottom: Int): View = View(this).apply {
         setBackgroundColor(COLOR_DIVIDER)
         layoutParams = LinearLayout.LayoutParams(
@@ -501,10 +625,18 @@ class MainActivity : Activity() {
             setPadding(0, dp(12), 0, 0)
         })
 
+        // Allow the internal EditText inside each NumberPicker to receive typed input
+        // and make the typed value commit on confirm (must call clearFocus first).
+        minutesPicker.descendantFocusability = NumberPicker.FOCUS_BEFORE_DESCENDANTS
+        secondsPicker.descendantFocusability = NumberPicker.FOCUS_BEFORE_DESCENDANTS
+
         AlertDialog.Builder(this)
             .setTitle("How far back?")
             .setView(dialogRoot)
             .setPositiveButton("Set") { _, _ ->
+                // Commit any in-progress typed value before reading .value
+                minutesPicker.clearFocus()
+                secondsPicker.clearFocus()
                 val total = minutesPicker.value * 60 + secondsPicker.value
                 if (total < 30) {
                     durationSec = 30
@@ -635,20 +767,57 @@ class MainActivity : Activity() {
             updateStatus()
         } else {
             setSwitchSilently(true)
-            AlertDialog.Builder(this)
-                .setTitle("Turn RECALL off?")
-                .setMessage(
-                    "If you turn RECALL off, you will not be able to recover audio from any conversation, meeting, class session, or moment you forget to record manually.\n\nAre you sure?"
-                )
-                .setPositiveButton("Turn off") { _, _ ->
-                    prefs.edit().putBoolean(KEY_ENABLED, false).apply()
-                    stopCaptureService()
-                    setSwitchSilently(false)
-                    updateStatus()
-                }
-                .setNegativeButton("Keep listening") { _, _ -> }
-                .show()
+            showTurnOffDialog()
         }
+    }
+
+    private fun showTurnOffDialog() {
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22), dp(24), dp(22), dp(18))
+        }
+        content.addView(TextView(this).apply {
+            text = "TURN RECALL OFF?"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+            letterSpacing = 0.1f
+            setPadding(0, 0, 0, dp(12))
+        })
+        content.addView(TextView(this).apply {
+            text = "If you turn RECALL off, you won't be able to recover audio from any conversation, meeting, class, or moment you forget to record."
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setLineSpacing(dp(3).toFloat(), 1f)
+            setPadding(0, 0, 0, dp(22))
+        })
+
+        var dlgRef: Dialog? = null
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+        }
+        val keep = secondaryBtn("Keep listening") { dlgRef?.dismiss() }
+        keep.layoutParams = LinearLayout.LayoutParams(
+            0, dp(48), 1f
+        ).apply { marginEnd = dp(10) }
+        row.addView(keep)
+
+        val off = dangerBtn("Turn off") {
+            prefs.edit().putBoolean(KEY_ENABLED, false).apply()
+            stopCaptureService()
+            setSwitchSilently(false)
+            updateStatus()
+            dlgRef?.dismiss()
+        }
+        off.layoutParams = LinearLayout.LayoutParams(
+            0, dp(48), 1f
+        )
+        row.addView(off)
+        content.addView(row)
+
+        dlgRef = styledDialog(content)
+        dlgRef.show()
     }
 
     private fun setSwitchSilently(checked: Boolean) {
@@ -739,17 +908,25 @@ class MainActivity : Activity() {
     private fun showPackPicker() {
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(8), dp(16), dp(8))
+            setPadding(dp(20), dp(22), dp(20), dp(16))
         }
         container.addView(TextView(this).apply {
-            text = "Demo mode — tapping a pack simulates a purchase and credits your account instantly. Google Play billing will be wired in before public launch."
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            text = "BUY MINUTES"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+            letterSpacing = 0.1f
+            setPadding(0, 0, 0, dp(4))
+        })
+        container.addView(TextView(this).apply {
+            text = "Demo mode — tapping a pack simulates a purchase and credits your balance instantly. Google Play Billing will be wired in before public launch."
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(COLOR_TEXT_MUTED)
-            setPadding(0, 0, 0, dp(14))
+            setPadding(0, 0, 0, dp(16))
             setLineSpacing(dp(2).toFloat(), 1f)
         })
 
-        var dialogRef: AlertDialog? = null
+        var dialogRef: Dialog? = null
 
         for (pack in Billing.PACKS) {
             val highlightColor = if (pack.highlight) COLOR_ACCENT else COLOR_DIVIDER
@@ -819,12 +996,33 @@ class MainActivity : Activity() {
             ).apply { bottomMargin = dp(10) })
         }
 
+        // Close button at the bottom
+        val closeRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+            setPadding(0, dp(6), 0, 0)
+        }
+        val closeBtn = TextView(this).apply {
+            text = "CLOSE"
+            setTextColor(COLOR_ACCENT)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            letterSpacing = 0.14f
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            isClickable = true
+            isFocusable = true
+            background = RippleDrawable(
+                ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE),
+                null,
+                null
+            )
+            setOnClickListener { dialogRef?.dismiss() }
+        }
+        closeRow.addView(closeBtn)
+        container.addView(closeRow)
+
         val scroll = ScrollView(this).apply { addView(container) }
-        dialogRef = AlertDialog.Builder(this)
-            .setTitle("Buy minutes")
-            .setView(scroll)
-            .setNegativeButton("Close", null)
-            .create()
+        dialogRef = styledDialog(scroll)
         dialogRef.show()
     }
 
