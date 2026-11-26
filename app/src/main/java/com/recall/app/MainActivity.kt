@@ -811,26 +811,26 @@ class MainActivity : Activity() {
         })
 
         var dlgRef: Dialog? = null
-        val btnRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.END
-        }
-        val exitBtn = secondaryBtn("Exit") {
-            dlgRef?.dismiss()
-            finish()
-        }
-        exitBtn.layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f)
-            .apply { marginEnd = dp(10) }
-        btnRow.addView(exitBtn)
-
-        val agreeBtn = primaryBtn("Agree & Continue") {
+        // Stacked buttons — primary agree on top, ghost exit below. Full-width
+        // keeps the "I AGREE" label on one line on every screen size.
+        val agreeBtn = primaryBtn("I AGREE") {
             prefs.edit().putBoolean(KEY_TERMS, true).apply()
             dlgRef?.dismiss()
             ensurePermissionsAndStart()
         }
-        agreeBtn.layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f)
-        btnRow.addView(agreeBtn)
-        content.addView(btnRow)
+        agreeBtn.layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(54)
+        )
+        content.addView(agreeBtn)
+
+        val exitBtn = secondaryBtn("Exit") {
+            dlgRef?.dismiss()
+            finish()
+        }
+        exitBtn.layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(48)
+        ).apply { topMargin = dp(10) }
+        content.addView(exitBtn)
 
         val scroll = ScrollView(this).apply { addView(content) }
         dlgRef = styledDialog(scroll)
