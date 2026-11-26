@@ -12,7 +12,6 @@ import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.ViewGroup
-import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import android.widget.ImageView
@@ -23,7 +22,6 @@ class SplashActivity : Activity() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var handedOff = false
-    private var caretAnim: ObjectAnimator? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,39 +44,27 @@ class SplashActivity : Activity() {
             scaleY = 0.6f
         }
 
-        val nameRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(4) }
-            alpha = 0f
-        }
-
+        // Whole-word RECALL — pre-rendered, then faded in (no typewriter)
         val name = TextView(this).apply {
-            text = ""
+            text = "RECALL"
             setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
             typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
             letterSpacing = 0.34f
-        }
-        val caret = TextView(this).apply {
-            text = "▍" // thin vertical block caret
-            setTextColor(0xFF1D9BF0.toInt())
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
-            setPadding(dp(3), 0, 0, 0)
             alpha = 0f
+            translationY = dp(8).toFloat()
+            val lp = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(8) }
+            layoutParams = lp
         }
-        nameRow.addView(name)
-        nameRow.addView(caret)
 
         root.addView(logo)
-        root.addView(nameRow)
+        root.addView(name)
         setContentView(root)
 
-        // 1. Logo pops in with overshoot + fade — ~280ms
+        // 1. Logo pops in with overshoot + fade (~280ms)
         AnimatorSet().apply {
             playTogether(
                 ObjectAnimator.ofFloat(logo, "alpha", 0f, 1f),
@@ -86,64 +72,23 @@ class SplashActivity : Activity() {
                 ObjectAnimator.ofFloat(logo, "scaleY", 0.6f, 1f)
             )
             duration = 280
-            interpolator = OvershootInterpolator(1.2f)
+            interpolator = OvershootInterpolator(1.1f)
             start()
         }
 
-        // 2. Reveal the name row + caret, then start typewriter
+        // 2. RECALL fades in as a whole word with a subtle lift (~420ms)
         handler.postDelayed({
             if (handedOff) return@postDelayed
-            nameRow.animate()
+            name.animate()
                 .alpha(1f)
-                .setDuration(140)
+                .translationY(0f)
+                .setDuration(420)
                 .setInterpolator(DecelerateInterpolator())
                 .start()
-            startCaretBlink(caret)
-        }, 240)
+        }, 220)
 
-        // 3. Fast typewriter — ~38ms/char
-        val target = "RECALL"
-        val stepMs = 38L
-        var i = 0
-        val typeStep = object : Runnable {
-            override fun run() {
-                if (handedOff) return
-                if (i <= target.length) {
-                    name.text = target.substring(0, i)
-                    i++
-                    handler.postDelayed(this, stepMs)
-                } else {
-                    // small pop when complete
-                    nameRow.animate()
-                        .scaleX(1.04f).scaleY(1.04f)
-                        .setDuration(90)
-                        .withEndAction {
-                            nameRow.animate()
-                                .scaleX(1f).scaleY(1f)
-                                .setDuration(110)
-                                .start()
-                        }
-                        .start()
-                    // fade caret, then cross-fade out
-                    handler.postDelayed({
-                        caretAnim?.cancel()
-                        caret.animate().alpha(0f).setDuration(120).start()
-                    }, 160)
-                    handler.postDelayed({ handOff() }, 360)
-                }
-            }
-        }
-        handler.postDelayed(typeStep, 360)
-    }
-
-    private fun startCaretBlink(caret: TextView) {
-        caretAnim = ObjectAnimator.ofFloat(caret, "alpha", 1f, 0.15f).apply {
-            duration = 420
-            repeatCount = ObjectAnimator.INFINITE
-            repeatMode = ObjectAnimator.REVERSE
-            interpolator = AccelerateDecelerateInterpolator()
-            start()
-        }
+        // 3. Hold briefly after the word is in, then hand off (~1000ms total)
+        handler.postDelayed({ handOff() }, 980)
     }
 
     private fun handOff() {
@@ -157,7 +102,6 @@ class SplashActivity : Activity() {
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
-        caretAnim?.cancel()
         super.onDestroy()
     }
 
