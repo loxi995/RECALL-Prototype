@@ -369,6 +369,28 @@ class MainActivity : Activity() {
         saveBtn = secondaryBtn("SAVE TO DEVICE") { saveRecoveryToDevice() }
         root.addView(saveBtn)
 
+        // How to use link
+        val helpRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, dp(22), 0, 0)
+        }
+        helpRow.addView(TextView(this).apply {
+            text = "HOW TO USE RECALL"
+            setTextColor(COLOR_ACCENT)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            letterSpacing = 0.14f
+            isClickable = true
+            isFocusable = true
+            background = RippleDrawable(
+                ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE), null, null
+            )
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+            setOnClickListener { showHelpDialog() }
+        })
+        root.addView(helpRow)
+
         // Footer
         root.addView(hairline(dp(28), dp(16)))
         root.addView(TextView(this).apply {
@@ -711,30 +733,263 @@ class MainActivity : Activity() {
     }
 
     private fun showDisclosure() {
-        AlertDialog.Builder(this)
-            .setTitle("Microphone access")
-            .setMessage(
-                "RECALL continuously captures audio from your microphone while listening is ON. " +
-                "This powers the recovery feature — the ability to get back the last up-to-12 hours " +
-                "of ambient sound.\n\n" +
-                "HOW YOUR AUDIO IS HANDLED\n" +
-                "• Stored only on this device, in RECALL's private app storage\n" +
-                "• Overwritten automatically every 12 hours (rolling buffer)\n" +
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22), dp(24), dp(22), dp(18))
+        }
+
+        content.addView(TextView(this).apply {
+            text = "WELCOME TO RECALL"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+            letterSpacing = 0.1f
+            setPadding(0, 0, 0, dp(12))
+        })
+
+        content.addView(TextView(this).apply {
+            text = "RECALL continuously captures audio from your microphone while listening is ON. This powers the recovery feature — the ability to get back the last several hours (or days) of ambient sound on demand."
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setLineSpacing(dp(3).toFloat(), 1f)
+            setPadding(0, 0, 0, dp(16))
+        })
+
+        content.addView(TextView(this).apply {
+            text = "HOW YOUR AUDIO IS HANDLED"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT_MUTED)
+            letterSpacing = 0.14f
+            setPadding(0, 0, 0, dp(6))
+        })
+        content.addView(TextView(this).apply {
+            text = "• Stored only on this device, in RECALL's private app storage\n" +
+                "• Overwritten automatically on a rolling schedule\n" +
                 "• Never uploaded, transmitted, or shared with anyone\n" +
-                "• Deleted entirely when you uninstall the app\n\n" +
-                "YOUR RESPONSIBILITY\n" +
-                "Audio-recording laws vary by region. In many places it is illegal to record a " +
-                "conversation without the consent of every participant. You are solely responsible " +
-                "for complying with the laws that apply to you.\n\n" +
-                "By tapping Agree & Continue you accept the Privacy Policy and Terms of Service."
-            )
-            .setPositiveButton("Agree & Continue") { _, _ ->
-                prefs.edit().putBoolean(KEY_TERMS, true).apply()
-                ensurePermissionsAndStart()
+                "• Deleted entirely when you uninstall the app"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setLineSpacing(dp(4).toFloat(), 1f)
+            setPadding(0, 0, 0, dp(16))
+        })
+
+        content.addView(TextView(this).apply {
+            text = "YOUR RESPONSIBILITY"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT_MUTED)
+            letterSpacing = 0.14f
+            setPadding(0, 0, 0, dp(6))
+        })
+        content.addView(TextView(this).apply {
+            text = "Audio-recording laws vary by region. In many places it is illegal to record a conversation without the consent of every participant. You are solely responsible for complying with the laws that apply to you."
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setLineSpacing(dp(4).toFloat(), 1f)
+            setPadding(0, 0, 0, dp(18))
+        })
+
+        // Clickable links to the full legal documents, opened in the browser
+        val linkRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 0, 0, dp(14))
+        }
+        linkRow.addView(legalLink("PRIVACY POLICY", PRIVACY_POLICY_URL).apply {
+            setPadding(0, dp(6), dp(14), dp(6))
+        })
+        linkRow.addView(legalLink("TERMS OF SERVICE", TERMS_URL).apply {
+            setPadding(dp(14), dp(6), 0, dp(6))
+        })
+        content.addView(linkRow)
+
+        content.addView(TextView(this).apply {
+            text = "By tapping Agree & Continue you accept the Privacy Policy and Terms of Service."
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setPadding(0, 0, 0, dp(20))
+        })
+
+        var dlgRef: Dialog? = null
+        val btnRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+        }
+        val exitBtn = secondaryBtn("Exit") {
+            dlgRef?.dismiss()
+            finish()
+        }
+        exitBtn.layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f)
+            .apply { marginEnd = dp(10) }
+        btnRow.addView(exitBtn)
+
+        val agreeBtn = primaryBtn("Agree & Continue") {
+            prefs.edit().putBoolean(KEY_TERMS, true).apply()
+            dlgRef?.dismiss()
+            ensurePermissionsAndStart()
+        }
+        agreeBtn.layoutParams = LinearLayout.LayoutParams(0, dp(48), 1f)
+        btnRow.addView(agreeBtn)
+        content.addView(btnRow)
+
+        val scroll = ScrollView(this).apply { addView(content) }
+        dlgRef = styledDialog(scroll)
+        dlgRef.setCancelable(false)
+        dlgRef.show()
+    }
+
+    private fun showHelpDialog() {
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22), dp(24), dp(22), dp(18))
+        }
+
+        content.addView(TextView(this).apply {
+            text = "HOW TO USE RECALL"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+            letterSpacing = 0.1f
+            setPadding(0, 0, 0, dp(6))
+        })
+        content.addView(TextView(this).apply {
+            text = "RECALL is an audio time machine. It quietly keeps a rolling buffer of ambient sound so you can go back and grab anything you missed."
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setLineSpacing(dp(3).toFloat(), 1f)
+            setPadding(0, 0, 0, dp(18))
+        })
+
+        val steps = listOf(
+            "TURN ON LISTENING"
+                to "Toggle the Always Listening switch to ON. RECALL starts quietly capturing audio in the background. The green dot in the status bar means your phone is capturing — that's an Android privacy indicator, not something RECALL controls.",
+            "LET IT CAPTURE"
+                to "Keep the app running in the background. You can lock your phone, open other apps — RECALL keeps listening. 'Captured so far' shows how much audio is currently in the buffer.",
+            "PICK HOW FAR BACK"
+                to "Tap 'How far back' and spin the wheels to choose a duration (30 seconds up to your buffer limit). You can also tap a number to type it directly.",
+            "RECOVER THE AUDIO"
+                to "Tap RECOVER AUDIO. RECALL grabs that slice from the buffer, decodes it, and makes it ready to play.",
+            "PLAY & SAVE"
+                to "Tap PLAY LAST RECOVERY to listen. Tap SAVE TO DEVICE to write it as a WAV file in your Music/RECALL folder — permanent and shareable.",
+            "MINUTES"
+                to "Each recovery costs minutes from your balance. New users get a 60-second free trial. Tap +BUY MIN (top-right) to add more.",
+            "EXTEND YOUR BUFFER"
+                to "Default is 24 hours of audio kept on-device. Tap the BUFFER WINDOW card to extend up to 7 days (optional upgrade)."
+        )
+
+        for ((i, step) in steps.withIndex()) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, 0, 0, dp(16))
             }
-            .setNegativeButton("Exit") { _, _ -> finish() }
-            .setCancelable(false)
-            .show()
+            val num = TextView(this).apply {
+                text = "${i + 1}"
+                setTextColor(Color.WHITE)
+                setTypeface(typeface, Typeface.BOLD)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                gravity = Gravity.CENTER
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(COLOR_ACCENT)
+                }
+                layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply {
+                    topMargin = dp(2); rightMargin = dp(12)
+                }
+            }
+            row.addView(num)
+            val col = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+                )
+            }
+            col.addView(TextView(this).apply {
+                text = step.first
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(COLOR_TEXT)
+                letterSpacing = 0.1f
+                setPadding(0, 0, 0, dp(2))
+            })
+            col.addView(TextView(this).apply {
+                text = step.second
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setTextColor(COLOR_TEXT_MUTED)
+                setLineSpacing(dp(3).toFloat(), 1f)
+            })
+            row.addView(col)
+            content.addView(row)
+        }
+
+        content.addView(TextView(this).apply {
+            text = "TIPS"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT_MUTED)
+            letterSpacing = 0.14f
+            setPadding(0, dp(4), 0, dp(8))
+        })
+        content.addView(TextView(this).apply {
+            text = "• Add RECALL to your battery-optimization whitelist so Samsung doesn't kill the service in your pocket.\n" +
+                "• Audio never leaves your phone. Uninstalling the app deletes every byte instantly.\n" +
+                "• You are responsible for recording laws in your region — don't use RECALL on people who haven't consented."
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setLineSpacing(dp(4).toFloat(), 1f)
+            setPadding(0, 0, 0, dp(18))
+        })
+
+        var dlgRef: Dialog? = null
+        val closeRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+        }
+        closeRow.addView(TextView(this).apply {
+            text = "GOT IT"
+            setTextColor(COLOR_ACCENT)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            letterSpacing = 0.14f
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            isClickable = true
+            isFocusable = true
+            background = RippleDrawable(
+                ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE), null, null
+            )
+            setOnClickListener { dlgRef?.dismiss() }
+        })
+        content.addView(closeRow)
+
+        val scroll = ScrollView(this).apply { addView(content) }
+        dlgRef = styledDialog(scroll)
+        dlgRef.show()
+    }
+
+    /** Small accent-colored tappable label that opens [url] in the browser. */
+    private fun legalLink(label: String, url: String): TextView = TextView(this).apply {
+        text = label
+        setTextColor(COLOR_ACCENT)
+        setTypeface(typeface, Typeface.BOLD)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        letterSpacing = 0.14f
+        isClickable = true
+        isFocusable = true
+        background = RippleDrawable(
+            ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE),
+            null,
+            null
+        )
+        setOnClickListener {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            } catch (_: Exception) {
+                Toast.makeText(
+                    this@MainActivity,
+                    "Install a browser to view this document.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
     }
 
     private fun ensurePermissionsAndStart() {
@@ -1515,5 +1770,14 @@ class MainActivity : Activity() {
         const val COLOR_ACCENT = 0xFF1D9BF0.toInt()
         const val COLOR_ACCENT_DIM = 0xFF1A4766.toInt()
         const val COLOR_ACCENT_RIPPLE = 0x33FFFFFF
+
+        // Legal document URLs. GitHub renders Markdown in the browser, so these
+        // work without GitHub Pages. Once Pages is enabled, swap to:
+        //   https://loxi995.github.io/RECALL-Prototype/privacy-policy
+        //   https://loxi995.github.io/RECALL-Prototype/terms-of-service
+        const val PRIVACY_POLICY_URL =
+            "https://github.com/loxi995/RECALL-Prototype/blob/main/legal/privacy-policy.md"
+        const val TERMS_URL =
+            "https://github.com/loxi995/RECALL-Prototype/blob/main/legal/terms-of-service.md"
     }
 }

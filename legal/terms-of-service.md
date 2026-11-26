@@ -10,7 +10,7 @@ By downloading, installing, or using the RECALL application ("RECALL," "the App"
 
 ## 1. What RECALL Is
 
-RECALL is an Android application that maintains a rolling 12-hour buffer of ambient audio on your device. You can retrieve the most recent audio at any time as a "recovery" — for example, when you forgot to press record on something you later realized you wanted.
+RECALL is an Android application that maintains a rolling audio buffer of ambient sound on your device — 24 hours by default, extendable up to 7 days through optional buffer-tier upgrades. You can retrieve the most recent audio at any time as a "recovery" — for example, when you forgot to press record on something you later realized you wanted.
 
 RECALL operates entirely on your device. No audio is uploaded to RECALL Audio or any third party by the App.
 

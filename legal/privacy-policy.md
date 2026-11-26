@@ -18,10 +18,10 @@ This Privacy Policy explains what information RECALL collects, how it is used, a
 ## 2. Information We Access on Your Device
 
 ### 2.1 Microphone Audio
-RECALL accesses the microphone continuously while the "Always Listening" feature is enabled. Captured audio is written to a rolling 12-hour buffer in the app's private storage directory (`/data/data/com.recall.app/files/`), which is not accessible to other apps on your device.
+RECALL accesses the microphone continuously while the "Always Listening" feature is enabled. Captured audio is encoded as Opus (24 kbps mono) and written to a rolling buffer stored as time-stamped OGG chunks in the app's private storage directory (`/data/data/com.recall.app/files/chunks/`), which is not accessible to other apps on your device. The default buffer window is 24 hours; users can extend this up to 7 days through optional buffer-tier upgrades.
 
 - **Purpose:** to allow you to recover the most recent audio when you did not record it manually.
-- **Retention on device:** maximum of 12 hours, automatically overwritten in a first-in/first-out ring buffer.
+- **Retention on device:** 24 hours by default (extendable up to 7 days by the user). Chunks older than the active buffer window are automatically deleted in a first-in/first-out schedule.
 - **Transmission:** never. The app does not request the INTERNET permission and cannot send network traffic.
 - **Third-party access:** none. The audio buffer is sandboxed to RECALL by the Android operating system.
 
