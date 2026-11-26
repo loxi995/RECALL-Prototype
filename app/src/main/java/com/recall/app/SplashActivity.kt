@@ -38,7 +38,7 @@ class SplashActivity : Activity() {
 
         val logo = ImageView(this).apply {
             setImageResource(R.drawable.ic_launcher_foreground)
-            layoutParams = LinearLayout.LayoutParams(dp(150), dp(150))
+            layoutParams = LinearLayout.LayoutParams(dp(100), dp(100))
             alpha = 0f
             scaleX = 0.6f
             scaleY = 0.6f
