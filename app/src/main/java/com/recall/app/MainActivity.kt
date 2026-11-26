@@ -38,6 +38,7 @@ import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.CompoundButton
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.NumberPicker
 import android.widget.ScrollView
@@ -861,26 +862,50 @@ class MainActivity : Activity() {
         })
 
         val steps = listOf(
-            "TURN ON LISTENING"
-                to "Toggle the Always Listening switch to ON. RECALL starts quietly capturing audio in the background. The green dot in the status bar means your phone is capturing — that's an Android privacy indicator, not something RECALL controls.",
-            "LET IT CAPTURE"
-                to "Keep the app running in the background. You can lock your phone, open other apps — RECALL keeps listening. 'Captured so far' shows how much audio is currently in the buffer.",
-            "PICK HOW FAR BACK"
-                to "Tap 'How far back' and spin the wheels to choose a duration (30 seconds up to your buffer limit). You can also tap a number to type it directly.",
-            "RECOVER THE AUDIO"
-                to "Tap RECOVER AUDIO. RECALL grabs that slice from the buffer, decodes it, and makes it ready to play.",
-            "PLAY & SAVE"
-                to "Tap PLAY LAST RECOVERY to listen. Tap SAVE TO DEVICE to write it as a WAV file in your Music/RECALL folder — permanent and shareable.",
-            "MINUTES"
-                to "Each recovery costs minutes from your balance. New users get a 60-second free trial. Tap +BUY MIN (top-right) to add more.",
-            "EXTEND YOUR BUFFER"
-                to "Default is 24 hours of audio kept on-device. Tap the BUFFER WINDOW card to extend up to 7 days (optional upgrade)."
+            Triple(
+                "TURN ON LISTENING",
+                "Toggle the Always Listening switch to ON. RECALL starts quietly capturing audio in the background. The green dot in the status bar is an Android privacy indicator — not something RECALL controls.",
+                R.drawable.help_1_switch
+            ),
+            Triple(
+                "LET IT CAPTURE",
+                "Keep the app running in the background. You can lock your phone, open other apps — RECALL keeps listening. 'Captured so far' shows how much audio is in the buffer.",
+                R.drawable.help_2_capture
+            ),
+            Triple(
+                "PICK HOW FAR BACK",
+                "Tap 'How far back' and spin the wheels to choose a duration (30 seconds up to your buffer limit). You can also tap a number to type it directly.",
+                R.drawable.help_3_duration
+            ),
+            Triple(
+                "RECOVER THE AUDIO",
+                "Tap RECOVER AUDIO. RECALL grabs that slice from the buffer, decodes it, and makes it ready to play.",
+                R.drawable.help_4_recover
+            ),
+            Triple(
+                "PLAY & SAVE",
+                "Tap PLAY LAST RECOVERY to listen. Tap SAVE TO DEVICE to write it as a WAV file in your Music/RECALL folder — permanent and shareable.",
+                R.drawable.help_5_playsave
+            ),
+            Triple(
+                "BUY MINUTES",
+                "Each recovery costs minutes from your balance. New users get a 60-second free trial. Tap +BUY MIN at the top-right to add more.",
+                R.drawable.help_6_buymin
+            ),
+            Triple(
+                "EXTEND YOUR BUFFER",
+                "Default is 24 hours of audio kept on-device. Tap the BUFFER WINDOW card to extend up to 7 days (optional upgrade).",
+                R.drawable.help_7_buffer
+            ),
         )
 
         for ((i, step) in steps.withIndex()) {
-            val row = LinearLayout(this).apply {
+            val stepContainer = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(0, 0, 0, dp(22))
+            }
+            val textRow = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
-                setPadding(0, 0, 0, dp(16))
             }
             val num = TextView(this).apply {
                 text = "${i + 1}"
@@ -896,7 +921,7 @@ class MainActivity : Activity() {
                     topMargin = dp(2); rightMargin = dp(12)
                 }
             }
-            row.addView(num)
+            textRow.addView(num)
             val col = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 layoutParams = LinearLayout.LayoutParams(
@@ -917,8 +942,24 @@ class MainActivity : Activity() {
                 setTextColor(COLOR_TEXT_MUTED)
                 setLineSpacing(dp(3).toFloat(), 1f)
             })
-            row.addView(col)
-            content.addView(row)
+            textRow.addView(col)
+            stepContainer.addView(textRow)
+
+            // Mockup image with arrow showing exactly where to tap
+            stepContainer.addView(ImageView(this).apply {
+                setImageResource(step.third)
+                adjustViewBounds = true
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = dp(12)
+                    leftMargin = dp(40) // align under the text column (past the number circle)
+                }
+            })
+
+            content.addView(stepContainer)
         }
 
         content.addView(TextView(this).apply {
