@@ -89,9 +89,45 @@ class MainActivity : Activity() {
         }
     }
 
+    // Bottom-nav tab state (0 = Home, 1 = Search, 2 = Profile)
+    private var currentTab: Int = 0
+    private lateinit var tabHome: View
+    private lateinit var tabSearch: View
+    private lateinit var tabProfile: View
+    private lateinit var navHomeBtn: LinearLayout
+    private lateinit var navSearchBtn: LinearLayout
+    private lateinit var navProfileBtn: LinearLayout
+
+    // Theme-aware color accessors. Existing code referencing COLOR_BG etc.
+    // continues to work — Kotlin resolves the property on `this`, ignoring the
+    // older companion-level constants of the same name (which have been renamed).
+    private fun isDarkTheme(): Boolean =
+        getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_DARK_THEME, DEFAULT_DARK_THEME)
+
+    private val COLOR_BG: Int get() = if (isDarkTheme()) DARK_BG else LIGHT_BG
+    private val COLOR_TEXT: Int get() = if (isDarkTheme()) DARK_TEXT else LIGHT_TEXT
+    private val COLOR_TEXT_MUTED: Int get() =
+        if (isDarkTheme()) DARK_TEXT_MUTED else LIGHT_TEXT_MUTED
+    private val COLOR_DIVIDER: Int get() =
+        if (isDarkTheme()) DARK_DIVIDER else LIGHT_DIVIDER
+    private val COLOR_BTN_PRIMARY: Int get() =
+        if (isDarkTheme()) DARK_BTN_PRIMARY else LIGHT_BTN_PRIMARY
+    private val COLOR_BTN_PRIMARY_FG: Int get() =
+        if (isDarkTheme()) DARK_BTN_PRIMARY_FG else LIGHT_BTN_PRIMARY_FG
+    private val COLOR_BTN_PRIMARY_RIPPLE: Int get() =
+        if (isDarkTheme()) DARK_BTN_PRIMARY_RIPPLE else LIGHT_BTN_PRIMARY_RIPPLE
+    private val COLOR_BTN_SECONDARY_RIPPLE: Int get() =
+        if (isDarkTheme()) DARK_BTN_SECONDARY_RIPPLE else LIGHT_BTN_SECONDARY_RIPPLE
+    private val COLOR_ACCENT_DIM: Int get() =
+        if (isDarkTheme()) DARK_ACCENT_DIM else LIGHT_ACCENT_DIM
+    private val COLOR_ACCENT_RIPPLE: Int get() =
+        if (isDarkTheme()) DARK_ACCENT_RIPPLE else LIGHT_ACCENT_RIPPLE
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        currentTab = savedInstanceState?.getInt(STATE_CURRENT_TAB, 0) ?: 0
         Billing.ensureInit(this)
         buildUi()
         updateBalance()
@@ -103,6 +139,11 @@ class MainActivity : Activity() {
         } else {
             ensurePermissionsAndStart()
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(STATE_CURRENT_TAB, currentTab)
     }
 
     private fun dp(value: Int): Int =
@@ -467,7 +508,7 @@ class MainActivity : Activity() {
             setLineSpacing(dp(4).toFloat(), 1f)
         })
 
-        // Floating top-right BUY MINUTES pill (neon-stroked, pinned above scroll)
+        // Three-tab shell: Home (existing content) + Search + Profile
         val rootFrame = FrameLayout(this).apply { setBackgroundColor(COLOR_BG) }
         rootFrame.addView(
             scroll,
@@ -476,6 +517,26 @@ class MainActivity : Activity() {
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
         )
+        tabHome = scroll
+
+        tabSearch = buildSearchContent()
+        rootFrame.addView(
+            tabSearch,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+        tabProfile = buildProfileContent()
+        rootFrame.addView(
+            tabProfile,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+
+        // Floating top-right BUY MINUTES pill — visible across all tabs
         buyBtn = buyPill { showPackPicker() }
         rootFrame.addView(
             buyBtn,
@@ -488,7 +549,27 @@ class MainActivity : Activity() {
                 rightMargin = dp(20)
             }
         )
-        setContentView(rootFrame)
+
+        // Bottom navigation bar — vertical root wraps content + nav
+        val bottomNav = buildBottomNav()
+        val verticalRoot = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(COLOR_BG)
+        }
+        verticalRoot.addView(
+            rootFrame,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
+        )
+        verticalRoot.addView(
+            bottomNav,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(64)
+            )
+        )
+        setContentView(verticalRoot)
+        switchToTab(currentTab)
 
         // Switch state + listener
         alwaysSwitch.isChecked = prefs.getBoolean(KEY_ENABLED, true)
@@ -902,6 +983,319 @@ class MainActivity : Activity() {
         dlgRef = styledDialog(scroll)
         dlgRef.setCancelable(false)
         dlgRef.show()
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // Bottom navigation + tab content builders
+    // ────────────────────────────────────────────────────────────
+
+    private fun buildBottomNav(): View {
+        val nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setBackgroundColor(COLOR_BG)
+        }
+        // Thin divider across the top edge of the nav
+        val wrapper = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(COLOR_BG)
+        }
+        wrapper.addView(View(this).apply {
+            setBackgroundColor(COLOR_DIVIDER)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(1)
+            )
+        })
+        navHomeBtn = buildNavTab("HOME", "⌂", 0)
+        navSearchBtn = buildNavTab("SEARCH", "⌕", 1)
+        navProfileBtn = buildNavTab("PROFILE", "●", 2)
+        nav.addView(navHomeBtn, LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.MATCH_PARENT, 1f
+        ))
+        nav.addView(navSearchBtn, LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.MATCH_PARENT, 1f
+        ))
+        nav.addView(navProfileBtn, LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.MATCH_PARENT, 1f
+        ))
+        wrapper.addView(nav, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+        ))
+        return wrapper
+    }
+
+    private fun buildNavTab(label: String, icon: String, index: Int): LinearLayout {
+        val isActive = (currentTab == index)
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            background = RippleDrawable(
+                ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE), null, null
+            )
+            setOnClickListener { switchToTab(index) }
+            addView(TextView(context).apply {
+                text = icon
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(if (isActive) COLOR_ACCENT else COLOR_TEXT_MUTED)
+                gravity = Gravity.CENTER
+            })
+            addView(TextView(context).apply {
+                text = label
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(if (isActive) COLOR_ACCENT else COLOR_TEXT_MUTED)
+                letterSpacing = 0.14f
+                setPadding(0, dp(2), 0, 0)
+            })
+        }
+    }
+
+    private fun switchToTab(index: Int) {
+        currentTab = index
+        tabHome.visibility = if (index == 0) View.VISIBLE else View.GONE
+        tabSearch.visibility = if (index == 1) View.VISIBLE else View.GONE
+        tabProfile.visibility = if (index == 2) View.VISIBLE else View.GONE
+        // Re-tint nav buttons
+        tintNavTab(navHomeBtn, 0)
+        tintNavTab(navSearchBtn, 1)
+        tintNavTab(navProfileBtn, 2)
+    }
+
+    private fun tintNavTab(btn: LinearLayout, index: Int) {
+        val isActive = (currentTab == index)
+        val color = if (isActive) COLOR_ACCENT else COLOR_TEXT_MUTED
+        (btn.getChildAt(0) as? TextView)?.setTextColor(color)
+        (btn.getChildAt(1) as? TextView)?.setTextColor(color)
+    }
+
+    private fun buildSearchContent(): View {
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(COLOR_BG)
+            isVerticalScrollBarEnabled = false
+        }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(56), dp(20), dp(32))
+        }
+        scroll.addView(root, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
+
+        root.addView(TextView(this).apply {
+            text = "SEARCH"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 34f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+            letterSpacing = -0.02f
+            setPadding(0, 0, 0, dp(2))
+        })
+        root.addView(TextView(this).apply {
+            text = "Find a specific moment in your rolling buffer"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setPadding(0, 0, 0, dp(24))
+        })
+
+        // Quick action: open the time-range picker
+        root.addView(primaryBtn("PICK A TIME RANGE") { showTimeRangePicker() },
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(56)
+            ))
+
+        root.addView(TextView(this).apply {
+            text = "Pick a start and end time in your local timezone. RECALL returns exactly that slice from the on-device buffer."
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setLineSpacing(dp(3).toFloat(), 1f)
+            setPadding(0, dp(14), 0, dp(26))
+        })
+
+        root.addView(hairline(dp(0), dp(16)))
+        root.addView(TextView(this).apply {
+            text = "SAVED RECOVERIES"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT_MUTED)
+            letterSpacing = 0.14f
+            setPadding(0, 0, 0, dp(10))
+        })
+        root.addView(TextView(this).apply {
+            text = "WAV files you've exported via SAVE TO DEVICE appear in your Music folder under RECALL. Open any file manager or music app to browse them — this list view is coming soon."
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setLineSpacing(dp(3).toFloat(), 1f)
+        })
+        return scroll
+    }
+
+    private fun buildProfileContent(): View {
+        val scroll = ScrollView(this).apply {
+            setBackgroundColor(COLOR_BG)
+            isVerticalScrollBarEnabled = false
+        }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(56), dp(20), dp(32))
+        }
+        scroll.addView(root, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ))
+
+        root.addView(TextView(this).apply {
+            text = "PROFILE"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 34f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+            letterSpacing = -0.02f
+            setPadding(0, 0, 0, dp(2))
+        })
+        root.addView(TextView(this).apply {
+            text = "Account, settings, and quick links"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setPadding(0, 0, 0, dp(24))
+        })
+
+        // Theme toggle card
+        val themeCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(Color.TRANSPARENT)
+                setStroke(dp(1), COLOR_DIVIDER)
+                cornerRadius = dp(16).toFloat()
+            }
+            setPadding(dp(18), dp(14), dp(14), dp(14))
+        }
+        val themeCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+            )
+        }
+        themeCol.addView(TextView(this).apply {
+            text = "APPEARANCE"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT_MUTED)
+            letterSpacing = 0.14f
+            setPadding(0, 0, 0, dp(4))
+        })
+        themeCol.addView(TextView(this).apply {
+            text = if (isDarkTheme()) "Dark mode" else "Light mode"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+        })
+        themeCol.addView(TextView(this).apply {
+            text = "Toggle to switch between dark and light themes"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setPadding(0, dp(2), 0, 0)
+        })
+        themeCard.addView(themeCol)
+        themeCard.addView(Switch(this).apply {
+            isChecked = isDarkTheme()
+            thumbTintList = ColorStateList.valueOf(Color.WHITE)
+            trackTintList = ColorStateList(
+                arrayOf(
+                    intArrayOf(android.R.attr.state_checked),
+                    intArrayOf()
+                ),
+                intArrayOf(COLOR_ACCENT, 0xFF4A4A4A.toInt())
+            )
+            setOnCheckedChangeListener { _, checked ->
+                prefs.edit().putBoolean(KEY_DARK_THEME, checked).apply()
+                recreate()
+            }
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { marginStart = dp(12) })
+        root.addView(themeCard, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(20) })
+
+        // Quick links
+        root.addView(profileLinkRow("How to use RECALL") { showHelpDialog() })
+        root.addView(profileLinkRow("Buy minutes") { showPackPicker() })
+        root.addView(profileLinkRow("Extend buffer window") { showBufferTierPicker() })
+        root.addView(profileLinkRow("Configure alerts") { showAlertsPicker() })
+        root.addView(hairline(dp(20), dp(20)))
+
+        // Legal
+        root.addView(profileLinkRow("Privacy policy") {
+            try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_POLICY_URL))) }
+            catch (_: Exception) {}
+        })
+        root.addView(profileLinkRow("Terms of service") {
+            try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(TERMS_URL))) }
+            catch (_: Exception) {}
+        })
+
+        // Version footer
+        root.addView(hairline(dp(28), dp(16)))
+        root.addView(TextView(this).apply {
+            text = try {
+                val pi = packageManager.getPackageInfo(packageName, 0)
+                "RECALL v${pi.versionName}\nAudio stays on this device."
+            } catch (_: Exception) {
+                "RECALL\nAudio stays on this device."
+            }
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(COLOR_TEXT_MUTED)
+            gravity = Gravity.CENTER_HORIZONTAL
+            setLineSpacing(dp(4).toFloat(), 1f)
+        })
+        return scroll
+    }
+
+    private fun profileLinkRow(label: String, onClick: () -> Unit): View {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            isClickable = true
+            isFocusable = true
+            background = RippleDrawable(
+                ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE),
+                GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    setColor(Color.TRANSPARENT)
+                    cornerRadius = dp(12).toFloat()
+                },
+                GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    setColor(Color.WHITE)
+                    cornerRadius = dp(12).toFloat()
+                }
+            )
+            setPadding(dp(14), dp(16), dp(14), dp(16))
+            addView(TextView(context).apply {
+                text = label
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(COLOR_TEXT)
+                layoutParams = LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+                )
+            })
+            addView(TextView(context).apply {
+                text = "▸"
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                setTextColor(COLOR_TEXT_MUTED)
+            })
+            setOnClickListener { onClick() }
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(4) }
+        }
     }
 
     private fun showHelpDialog() {
@@ -2221,19 +2615,41 @@ class MainActivity : Activity() {
         const val REQ_NOTIF = 11
         const val REQ_WRITE = 12
 
-        const val COLOR_BG = 0xFF000000.toInt()
-        const val COLOR_TEXT = 0xFFFFFFFF.toInt()
-        const val COLOR_TEXT_MUTED = 0xFF71767B.toInt()
-        const val COLOR_DIVIDER = 0xFF2F3336.toInt()
+        // Theme preference key + default (true = dark)
+        const val KEY_DARK_THEME = "dark_theme"
+        const val DEFAULT_DARK_THEME = true
+
+        // Saved-instance key for the currently-visible tab index
+        const val STATE_CURRENT_TAB = "current_tab"
+
+        // Dark palette
+        const val DARK_BG = 0xFF000000.toInt()
+        const val DARK_TEXT = 0xFFFFFFFF.toInt()
+        const val DARK_TEXT_MUTED = 0xFF71767B.toInt()
+        const val DARK_DIVIDER = 0xFF2F3336.toInt()
+        const val DARK_BTN_PRIMARY = 0xFFFFFFFF.toInt()
+        const val DARK_BTN_PRIMARY_FG = 0xFF000000.toInt()
+        const val DARK_BTN_PRIMARY_RIPPLE = 0x33000000
+        const val DARK_BTN_SECONDARY_RIPPLE = 0x33FFFFFF
+        const val DARK_ACCENT_DIM = 0xFF1A4766.toInt()
+        const val DARK_ACCENT_RIPPLE = 0x33FFFFFF
+
+        // Light palette (near-white bg, dark text)
+        const val LIGHT_BG = 0xFFF7F8FA.toInt()
+        const val LIGHT_TEXT = 0xFF0F1419.toInt()
+        const val LIGHT_TEXT_MUTED = 0xFF536471.toInt()
+        const val LIGHT_DIVIDER = 0xFFDFE4EB.toInt()
+        const val LIGHT_BTN_PRIMARY = 0xFF0F1419.toInt()
+        const val LIGHT_BTN_PRIMARY_FG = 0xFFFFFFFF.toInt()
+        const val LIGHT_BTN_PRIMARY_RIPPLE = 0x33FFFFFF
+        const val LIGHT_BTN_SECONDARY_RIPPLE = 0x33000000
+        const val LIGHT_ACCENT_DIM = 0xFFCFE4F6.toInt()
+        const val LIGHT_ACCENT_RIPPLE = 0x33000000
+
+        // Theme-neutral (identical in both modes)
         const val COLOR_STATUS_LIVE = 0xFF00BA7C.toInt()
         const val COLOR_STATUS_OFF = 0xFF71767B.toInt()
-        const val COLOR_BTN_PRIMARY = 0xFFFFFFFF.toInt()
-        const val COLOR_BTN_PRIMARY_FG = 0xFF000000.toInt()
-        const val COLOR_BTN_PRIMARY_RIPPLE = 0x33000000
-        const val COLOR_BTN_SECONDARY_RIPPLE = 0x33FFFFFF
         const val COLOR_ACCENT = 0xFF1D9BF0.toInt()
-        const val COLOR_ACCENT_DIM = 0xFF1A4766.toInt()
-        const val COLOR_ACCENT_RIPPLE = 0x33FFFFFF
 
         // Legal document URLs. GitHub renders Markdown in the browser, so these
         // work without GitHub Pages. Once Pages is enabled, swap to:
