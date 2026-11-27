@@ -1920,7 +1920,7 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(4))
         })
         content.addView(TextView(this).apply {
-            text = t("RECALL only notifies you when something actually goes wrong — never \")come back and use the app\" nags."
+            text = t("RECALL only notifies you when something actually goes wrong — never 'come back and use the app' nags.")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(COLOR_TEXT_MUTED)
             setPadding(0, 0, 0, dp(18))
