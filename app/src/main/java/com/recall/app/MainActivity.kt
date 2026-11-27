@@ -541,7 +541,7 @@ class MainActivity : Activity() {
         pagerScroll = HorizontalScrollView(this).apply {
             isHorizontalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
-            addView(pagerContent, HorizontalScrollView.LayoutParams(
+            addView(pagerContent, FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             ))
