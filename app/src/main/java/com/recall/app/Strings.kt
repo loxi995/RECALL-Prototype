@@ -215,6 +215,17 @@ object Strings {
         "• Add RECALL to your battery-optimization whitelist so Samsung doesn't kill the service in your pocket.\n• Audio never leaves your phone. Uninstalling the app deletes every byte instantly.\n• You are responsible for recording laws in your region — don't use RECALL on people who haven't consented."
             to "• أضف ريكول إلى قائمة استثناء تحسين البطارية حتى لا يوقف سامسونج الخدمة أثناء وجود الهاتف في جيبك.\n• الصوت لا يغادر هاتفك أبدًا. إلغاء تثبيت التطبيق يحذف كل بايت فورًا.\n• أنت مسؤول عن قوانين التسجيل في منطقتك — لا تستخدم ريكول على أشخاص لم يوافقوا.",
 
+        // Pack picker body + labels
+        "Demo mode — tapping a pack simulates a purchase and credits your balance instantly. Google Play Billing will be wired in before public launch."
+            to "الوضع التجريبي — اضغط على عرض ليتم محاكاة الشراء وإضافة الرصيد فورًا. سيتم ربط Google Play Billing قبل الإطلاق الرسمي.",
+        "minutes" to "دقيقة",
+        "STARTER" to "مبتدئ",
+        "SAVE 16%" to "وفّر ١٦٪",
+        "BEST VALUE" to "أفضل قيمة",
+        "SAVE 50%" to "وفّر ٥٠٪",
+        "BEST DEAL" to "أفضل صفقة",
+        "+N minutes added (demo)." to "تمت إضافة الدقائق (تجريبي).",
+
         // Dialog titles / common buttons
         "BUY MINUTES" to "شراء دقائق",
         "EXTEND BUFFER" to "تمديد نافذة التخزين",

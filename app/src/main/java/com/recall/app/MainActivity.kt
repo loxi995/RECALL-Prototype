@@ -150,6 +150,20 @@ class MainActivity : Activity() {
 
     private fun tIsAr(): Boolean = Strings.isArabic(this)
 
+    /** Converts every ASCII digit in [s] to Arabic-Indic (٠-٩) when the active language is Arabic. */
+    private fun localizeDigits(s: String): String {
+        if (!tIsAr()) return s
+        val sb = StringBuilder(s.length)
+        for (c in s) {
+            sb.append(when (c) {
+                '0' -> '٠'; '1' -> '١'; '2' -> '٢'; '3' -> '٣'; '4' -> '٤'
+                '5' -> '٥'; '6' -> '٦'; '7' -> '٧'; '8' -> '٨'; '9' -> '٩'
+                else -> c
+            })
+        }
+        return sb.toString()
+    }
+
     /**
      * Writes any uncaught crash to the app's external files directory so we
      * can pull it later. Never silences the crash — the system's crash dialog
@@ -691,7 +705,10 @@ class MainActivity : Activity() {
             )
         )
 
-        // Floating top-right BUY MINUTES pill — visible across all tabs
+        // Floating BUY MINUTES pill — visible across all tabs.
+        // Uses marginStart/marginEnd (RTL-aware) so the pill mirrors from
+        // top-right in English to top-left in Arabic, keeping symmetric
+        // spacing from the edge in both modes.
         buyBtn = buyPill { showPackPicker() }
         rootFrame.addView(
             buyBtn,
@@ -701,7 +718,8 @@ class MainActivity : Activity() {
             ).apply {
                 gravity = Gravity.TOP or Gravity.END
                 topMargin = dp(52)
-                rightMargin = dp(20)
+                marginEnd = dp(20)
+                marginStart = dp(20)
             }
         )
 
@@ -897,6 +915,10 @@ class MainActivity : Activity() {
     private fun styledDialog(contentView: View): Dialog {
         val dlg = Dialog(this)
         dlg.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        // Force the dialog's content to use the active layout direction so RTL
+        // (Arabic) mirrors all horizontal rows inside the dialog.
+        contentView.layoutDirection =
+            if (tIsAr()) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
         dlg.setContentView(contentView)
         dlg.setCancelable(true)
         dlg.setCanceledOnTouchOutside(true)
@@ -1017,6 +1039,7 @@ class MainActivity : Activity() {
             value = (durationSec / 60).coerceIn(0, maxMinutes)
             wrapSelectorWheel = false
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            setFormatter { localizeDigits(it.toString()) }
         }
         val secondsPicker = NumberPicker(this).apply {
             minValue = 0
@@ -1024,7 +1047,7 @@ class MainActivity : Activity() {
             value = (durationSec % 60).coerceIn(0, 59)
             wrapSelectorWheel = true
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-            setFormatter { String.format(Locale.US, "%02d", it) }
+            setFormatter { localizeDigits(String.format(Locale.US, "%02d", it)) }
         }
         pickers.addView(minutesPicker)
         pickers.addView(secondsPicker)
@@ -1991,19 +2014,19 @@ class MainActivity : Activity() {
         val total = trial + paid
         val m = total / 60
         val s = total % 60
-        balanceBigText.text = String.format(
+        balanceBigText.text = localizeDigits(String.format(
             Locale.US, "%d %s %02d %s", m, t("min"), s, t("sec")
-        )
+        ))
         balanceBigText.setTextColor(
             if (total == 0) 0xFFFF6B6B.toInt() else COLOR_TEXT
         )
         balanceSubText.text = when {
             trial > 0 && paid == 0 ->
-                "${t("Free trial")} · $trial ${t("sec included")}"
+                "${t("Free trial")} · ${localizeDigits(trial.toString())} ${t("sec included")}"
             trial > 0 && paid > 0 ->
-                "${t("Trial")} ${trial}${t("sec")} + ${t("Paid")} ${paid / 60}${t("min")} ${paid % 60}${t("sec")}"
+                "${t("Trial")} ${localizeDigits(trial.toString())}${t("sec")} + ${t("Paid")} ${localizeDigits((paid / 60).toString())}${t("min")} ${localizeDigits((paid % 60).toString())}${t("sec")}"
             trial == 0 && paid > 0 ->
-                "${t("Paid balance")} · ${paid / 60} ${t("min")} ${paid % 60} ${t("sec")}"
+                "${t("Paid balance")} · ${localizeDigits((paid / 60).toString())} ${t("min")} ${localizeDigits((paid % 60).toString())} ${t("sec")}"
             else -> t("No minutes left — tap BUY MINUTES")
         }
     }
@@ -2466,14 +2489,14 @@ class MainActivity : Activity() {
                 )
             }
             leftCol.addView(TextView(this).apply {
-                text = "${pack.minutes} minutes"
+                text = "${localizeDigits(pack.minutes.toString())} ${t("minutes")}"
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(COLOR_TEXT)
             })
             pack.badge?.let {
                 leftCol.addView(TextView(this).apply {
-                    text = it.uppercase(Locale.US)
+                    text = t(it.uppercase(Locale.US))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
                     setTypeface(typeface, Typeface.BOLD)
                     setTextColor(if (pack.highlight) COLOR_ACCENT else COLOR_STATUS_LIVE)
@@ -2483,7 +2506,7 @@ class MainActivity : Activity() {
             }
             row.addView(leftCol)
             row.addView(TextView(this).apply {
-                text = pack.priceUsd
+                text = pack.priceUsd  // USD stays universal
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(COLOR_TEXT)
@@ -2493,7 +2516,7 @@ class MainActivity : Activity() {
                 updateBalance()
                 Toast.makeText(
                     this,
-                    "+${pack.minutes} minutes added (demo).",
+                    "+${localizeDigits(pack.minutes.toString())} ${t("minutes")}",
                     Toast.LENGTH_SHORT
                 ).show()
                 dialogRef?.dismiss()
@@ -2550,7 +2573,7 @@ class MainActivity : Activity() {
             sb.append(s).append(' ').append(t("sec"))
         }
         if (sb.isEmpty()) sb.append(t("0 seconds"))
-        return sb.toString()
+        return localizeDigits(sb.toString())
     }
 
     private fun recoverAudio() {
