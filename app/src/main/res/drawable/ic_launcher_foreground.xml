@@ -4,13 +4,9 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Equalizer bars on the left (4 thin vertical bars, varying heights) -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M27,47 h2 v14 h-2 z M32,41 h2 v26 h-2 z M37,45 h2 v18 h-2 z M42,39 h2 v30 h-2 z" />
-    <!-- Bold rounded R, compact — everything fits inside the adaptive-icon safe zone -->
+    <!-- Big centered bold R — single-glyph brand mark, same pattern as X / Instagram / W -->
     <path
         android:fillColor="#FFFFFF"
         android:fillType="evenOdd"
-        android:pathData="M46,28 L65,28 C73,28 78,34 78,42 C78,50 73,56 65,57 L78,80 L69,80 L58,58 L56,58 L56,80 L46,80 Z M56,37 L64,37 C68,37 70,39 70,42 C70,45 68,48 64,48 L56,48 Z" />
+        android:pathData="M28,22 L63,22 C74,22 80,30 80,42 C80,53 74,61 63,62 L80,86 L69,86 L53,62 L42,62 L42,86 L28,86 Z M42,33 L60,33 C65,33 68,37 68,42 C68,47 65,51 60,51 L42,51 Z" />
 </vector>
