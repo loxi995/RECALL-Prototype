@@ -182,12 +182,17 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(24))
         })
 
-        // Balance card
+        // Balance card — theme-aware gradient
         val balanceCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            val gradientColors = if (isDarkTheme()) {
+                intArrayOf(0xFF0A1A2A.toInt(), 0xFF000000.toInt())
+            } else {
+                intArrayOf(0xFFE8F4FD.toInt(), 0xFFFFFFFF.toInt())
+            }
             background = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
-                intArrayOf(0xFF0A1A2A.toInt(), 0xFF000000.toInt())
+                gradientColors
             ).apply {
                 shape = GradientDrawable.RECTANGLE
                 setStroke(dp(1), COLOR_ACCENT_DIM)
@@ -695,9 +700,10 @@ class MainActivity : Activity() {
     /** Floating top-right neon-stroked BUY MINUTES pill. */
     private fun buyPill(onClick: () -> Unit): Button {
         val radius = dp(12).toFloat()
+        val fillColor = if (isDarkTheme()) 0xCC000000.toInt() else 0xCCFFFFFF.toInt()
         val content = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            setColor(0xCC000000.toInt())
+            setColor(fillColor)
             setStroke(dp(2), COLOR_ACCENT)
             cornerRadius = radius
         }
@@ -726,15 +732,16 @@ class MainActivity : Activity() {
         }
     }
 
-    /** Dialog with dark rounded card background + window blur behind (API 31+). */
+    /** Theme-aware rounded dialog background + window blur behind (API 31+). */
     private fun styledDialog(contentView: View): Dialog {
         val dlg = Dialog(this)
         dlg.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dlg.setContentView(contentView)
         dlg.window?.let { w ->
+            val bgColor = if (isDarkTheme()) 0xF2000000.toInt() else 0xFAFFFFFF.toInt()
             w.setBackgroundDrawable(GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                setColor(0xF2000000.toInt())
+                setColor(bgColor)
                 setStroke(dp(1), COLOR_DIVIDER)
                 cornerRadius = dp(22).toFloat()
             })
@@ -1005,9 +1012,9 @@ class MainActivity : Activity() {
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(1)
             )
         })
-        navHomeBtn = buildNavTab("HOME", "⌂", 0)
-        navSearchBtn = buildNavTab("SEARCH", "⌕", 1)
-        navProfileBtn = buildNavTab("PROFILE", "●", 2)
+        navHomeBtn = buildNavTab("HOME", R.drawable.ic_nav_home, 0)
+        navSearchBtn = buildNavTab("SEARCH", R.drawable.ic_nav_search, 1)
+        navProfileBtn = buildNavTab("PROFILE", R.drawable.ic_nav_profile, 2)
         nav.addView(navHomeBtn, LinearLayout.LayoutParams(
             0, LinearLayout.LayoutParams.MATCH_PARENT, 1f
         ))
@@ -1023,8 +1030,9 @@ class MainActivity : Activity() {
         return wrapper
     }
 
-    private fun buildNavTab(label: String, icon: String, index: Int): LinearLayout {
+    private fun buildNavTab(label: String, iconRes: Int, index: Int): LinearLayout {
         val isActive = (currentTab == index)
+        val tint = if (isActive) COLOR_ACCENT else COLOR_TEXT_MUTED
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -1034,20 +1042,20 @@ class MainActivity : Activity() {
                 ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE), null, null
             )
             setOnClickListener { switchToTab(index) }
-            addView(TextView(context).apply {
-                text = icon
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
-                setTypeface(typeface, Typeface.BOLD)
-                setTextColor(if (isActive) COLOR_ACCENT else COLOR_TEXT_MUTED)
-                gravity = Gravity.CENTER
+            addView(ImageView(context).apply {
+                setImageResource(iconRes)
+                imageTintList = ColorStateList.valueOf(tint)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                layoutParams = LinearLayout.LayoutParams(dp(26), dp(26))
             })
             addView(TextView(context).apply {
                 text = label
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(if (isActive) COLOR_ACCENT else COLOR_TEXT_MUTED)
+                setTextColor(tint)
                 letterSpacing = 0.14f
-                setPadding(0, dp(2), 0, 0)
+                gravity = Gravity.CENTER
+                setPadding(0, dp(4), 0, 0)
             })
         }
     }
@@ -1066,7 +1074,7 @@ class MainActivity : Activity() {
     private fun tintNavTab(btn: LinearLayout, index: Int) {
         val isActive = (currentTab == index)
         val color = if (isActive) COLOR_ACCENT else COLOR_TEXT_MUTED
-        (btn.getChildAt(0) as? TextView)?.setTextColor(color)
+        (btn.getChildAt(0) as? ImageView)?.imageTintList = ColorStateList.valueOf(color)
         (btn.getChildAt(1) as? TextView)?.setTextColor(color)
     }
 
