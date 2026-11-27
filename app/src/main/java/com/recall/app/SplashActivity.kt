@@ -38,7 +38,12 @@ class SplashActivity : Activity() {
 
         val logo = ImageView(this).apply {
             setImageResource(R.drawable.ic_launcher_foreground)
-            layoutParams = LinearLayout.LayoutParams(dp(100), dp(100))
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                setColor(0xFF1D9BF0.toInt())
+                cornerRadius = dp(26).toFloat()
+            }
+            layoutParams = LinearLayout.LayoutParams(dp(130), dp(130))
             alpha = 0f
             scaleX = 0.6f
             scaleY = 0.6f
