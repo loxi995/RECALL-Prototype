@@ -11,8 +11,8 @@ android {
         applicationId = "com.recall.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 29
-        versionName = "1.9.0"
+        versionCode = 30
+        versionName = "1.9.1"
     }
 
     signingConfigs {
@@ -42,4 +42,9 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+}
+
+dependencies {
+    implementation("androidx.viewpager2:viewpager2:1.1.0")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
 }

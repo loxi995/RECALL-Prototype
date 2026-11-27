@@ -31,7 +31,6 @@ import android.provider.Settings
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
@@ -41,9 +40,10 @@ import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.CompoundButton
 import android.widget.FrameLayout
-import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
+import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
 import android.widget.NumberPicker
 import android.widget.ScrollView
 import android.widget.Switch
@@ -100,9 +100,8 @@ class MainActivity : Activity() {
     private lateinit var navSearchBtn: LinearLayout
     private lateinit var navProfileBtn: LinearLayout
     // Horizontally-paging container holding the 3 tab views side by side
-    private lateinit var pagerScroll: HorizontalScrollView
-    private lateinit var pagerContent: LinearLayout
-    private var pagerLastScrollX = -1
+    private lateinit var viewPager: ViewPager2
+    private lateinit var pagerAdapter: TabPagerAdapter
 
     // Theme-aware color accessors. Existing code referencing COLOR_BG etc.
     // continues to work — Kotlin resolves the property on `this`, ignoring the
@@ -519,57 +518,33 @@ class MainActivity : Activity() {
             setLineSpacing(dp(4).toFloat(), 1f)
         })
 
-        // Horizontal pager: Home + Search + Profile side-by-side, swipeable
+        // Horizontal pager: Home + Search + Profile — ViewPager2 handles page
+        // sizing, touch arbitration (vertical scroll vs horizontal swipe),
+        // physics-based snap and fling for free.
         tabHome = scroll
         tabSearch = buildSearchContent()
         tabProfile = buildProfileContent()
 
-        val initialPageWidth = resources.displayMetrics.widthPixels
-        pagerContent = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-        pagerContent.addView(tabHome, LinearLayout.LayoutParams(
-            initialPageWidth, LinearLayout.LayoutParams.MATCH_PARENT
-        ))
-        pagerContent.addView(tabSearch, LinearLayout.LayoutParams(
-            initialPageWidth, LinearLayout.LayoutParams.MATCH_PARENT
-        ))
-        pagerContent.addView(tabProfile, LinearLayout.LayoutParams(
-            initialPageWidth, LinearLayout.LayoutParams.MATCH_PARENT
-        ))
-
-        pagerScroll = HorizontalScrollView(this).apply {
-            isHorizontalScrollBarEnabled = false
-            overScrollMode = View.OVER_SCROLL_NEVER
-            addView(pagerContent, FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            ))
-        }
-        // Snap-to-nearest-page after the user lifts their finger or a fling settles.
-        pagerScroll.setOnTouchListener { _, event ->
-            if (event.action == MotionEvent.ACTION_UP ||
-                event.action == MotionEvent.ACTION_CANCEL) {
-                handler.postDelayed({ snapPager() }, 60)
-            }
-            false
-        }
-        // After layout: size each page to the actual pager width (not display width,
-        // which may include insets) and scroll to the restored tab.
-        pagerScroll.post {
-            val w = pagerScroll.width
-            if (w > 0) {
-                for (i in 0 until pagerContent.childCount) {
-                    pagerContent.getChildAt(i).layoutParams.width = w
+        pagerAdapter = TabPagerAdapter(listOf(tabHome, tabSearch, tabProfile))
+        viewPager = ViewPager2(this).apply {
+            adapter = pagerAdapter
+            // Keep all pages alive so swiping doesn't re-inflate.
+            offscreenPageLimit = pagerAdapter.itemCount - 1
+            // Default orientation is HORIZONTAL — swipe left/right.
+            registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+                override fun onPageSelected(position: Int) {
+                    currentTab = position
+                    tintNavTab(navHomeBtn, 0)
+                    tintNavTab(navSearchBtn, 1)
+                    tintNavTab(navProfileBtn, 2)
                 }
-                pagerContent.requestLayout()
-                pagerScroll.scrollTo(currentTab * w, 0)
-            }
+            })
+            setCurrentItem(currentTab, false)
         }
 
         val rootFrame = FrameLayout(this).apply { setBackgroundColor(COLOR_BG) }
         rootFrame.addView(
-            pagerScroll,
+            viewPager,
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -1118,42 +1093,45 @@ class MainActivity : Activity() {
     }
 
     private fun switchToTab(index: Int) {
-        currentTab = index.coerceIn(0, pagerContent.childCount - 1)
-        val w = pagerScroll.width
-        if (w > 0) {
-            pagerScroll.smoothScrollTo(currentTab * w, 0)
-        } else {
-            // Not laid out yet — the pagerScroll.post {} in buildUi will scroll.
-            pagerScroll.post { pagerScroll.scrollTo(currentTab * pagerScroll.width, 0) }
-        }
-        tintNavTab(navHomeBtn, 0)
-        tintNavTab(navSearchBtn, 1)
-        tintNavTab(navProfileBtn, 2)
+        val clamped = index.coerceIn(0, pagerAdapter.itemCount - 1)
+        // ViewPager2's own OnPageChangeCallback will update currentTab + nav tint.
+        viewPager.setCurrentItem(clamped, true)
     }
 
     /**
-     * Called after the user's finger lifts: polls the scroll position, and once
-     * it has stopped changing (the fling has settled), smooth-scrolls to the
-     * nearest page and updates the bottom-nav active state.
+     * Adapter that hosts pre-built tab Views (not re-inflated templates). Each
+     * position gets its own view type so RecyclerView keeps a dedicated holder
+     * per page and never recycles between them.
      */
-    private fun snapPager() {
-        val cur = pagerScroll.scrollX
-        if (cur == pagerLastScrollX) {
-            val w = pagerScroll.width
-            if (w <= 0) { pagerLastScrollX = -1; return }
-            val page = ((cur + w / 2) / w).coerceIn(0, pagerContent.childCount - 1)
-            pagerScroll.smoothScrollTo(page * w, 0)
-            if (page != currentTab) {
-                currentTab = page
-                tintNavTab(navHomeBtn, 0)
-                tintNavTab(navSearchBtn, 1)
-                tintNavTab(navProfileBtn, 2)
+    private class TabPagerAdapter(
+        private val pages: List<View>
+    ) : RecyclerView.Adapter<TabPagerAdapter.VH>() {
+        class VH(val root: FrameLayout) : RecyclerView.ViewHolder(root)
+
+        override fun getItemViewType(position: Int): Int = position
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+            val root = FrameLayout(parent.context).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
             }
-            pagerLastScrollX = -1
-        } else {
-            pagerLastScrollX = cur
-            handler.postDelayed({ snapPager() }, 60)
+            val page = pages[viewType]
+            (page.parent as? ViewGroup)?.removeView(page)
+            root.addView(page, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ))
+            return VH(root)
         }
+
+        override fun onBindViewHolder(holder: VH, position: Int) {
+            // No-op: page content is bound in onCreateViewHolder since each
+            // position has its own view type.
+        }
+
+        override fun getItemCount(): Int = pages.size
     }
 
     private fun tintNavTab(btn: LinearLayout, index: Int) {
