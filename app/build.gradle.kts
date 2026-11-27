@@ -11,8 +11,8 @@ android {
         applicationId = "com.recall.app"
         minSdk = 29
         targetSdk = 35
-        versionCode = 33
-        versionName = "2.0.2"
+        versionCode = 34
+        versionName = "2.0.3"
     }
 
     signingConfigs {

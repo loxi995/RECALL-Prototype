@@ -174,7 +174,10 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         installCrashHandler()
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        currentTab = savedInstanceState?.getInt(STATE_CURRENT_TAB, 0) ?: 0
+        // Preserve the active tab across restartActivity() calls (theme / lang toggle)
+        currentTab = intent?.getIntExtra(EXTRA_RESUME_TAB, -1)
+            ?.takeIf { it >= 0 }
+            ?: (savedInstanceState?.getInt(STATE_CURRENT_TAB, 0) ?: 0)
         Billing.ensureInit(this)
         buildUi()
         updateBalance()
@@ -194,6 +197,8 @@ class MainActivity : Activity() {
     private fun restartActivity() {
         val intent = Intent(this, MainActivity::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+        // Keep the user on the tab they were on (usually Profile) after restart.
+        intent.putExtra(EXTRA_RESUME_TAB, currentTab)
         finish()
         startActivity(intent)
         @Suppress("DEPRECATION")
@@ -652,9 +657,13 @@ class MainActivity : Activity() {
             registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
                 override fun onPageSelected(position: Int) {
                     currentTab = position
-                    tintNavTab(navHomeBtn, 0)
-                    tintNavTab(navSearchBtn, 1)
-                    tintNavTab(navProfileBtn, 2)
+                    // Nav buttons are created later in buildBottomNav() —
+                    // skip tinting until they're ready.
+                    if (::navHomeBtn.isInitialized) {
+                        tintNavTab(navHomeBtn, 0)
+                        tintNavTab(navSearchBtn, 1)
+                        tintNavTab(navProfileBtn, 2)
+                    }
                 }
             })
             setCurrentItem(currentTab, false)
@@ -2877,6 +2886,8 @@ class MainActivity : Activity() {
 
         // Saved-instance key for the currently-visible tab index
         const val STATE_CURRENT_TAB = "current_tab"
+        // Intent extra used by restartActivity() to preserve the active tab
+        const val EXTRA_RESUME_TAB = "com.recall.app.EXTRA_RESUME_TAB"
 
         // Dark palette
         const val DARK_BG = 0xFF000000.toInt()
