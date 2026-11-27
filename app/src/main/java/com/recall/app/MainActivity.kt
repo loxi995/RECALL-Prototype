@@ -732,11 +732,19 @@ class MainActivity : Activity() {
         }
     }
 
-    /** Theme-aware rounded dialog background + window blur behind (API 31+). */
+    /**
+     * Theme-aware rounded dialog background + window blur behind (API 31+).
+     *
+     * Also caps the dialog's height after it's measured so there's always a
+     * visible tappable gap at the top/bottom — tapping outside the window
+     * dismisses the dialog (the standard Android convention).
+     */
     private fun styledDialog(contentView: View): Dialog {
         val dlg = Dialog(this)
         dlg.requestWindowFeature(Window.FEATURE_NO_TITLE)
         dlg.setContentView(contentView)
+        dlg.setCancelable(true)
+        dlg.setCanceledOnTouchOutside(true)
         dlg.window?.let { w ->
             val bgColor = if (isDarkTheme()) 0xF2000000.toInt() else 0xFAFFFFFF.toInt()
             w.setBackgroundDrawable(GradientDrawable().apply {
@@ -746,7 +754,8 @@ class MainActivity : Activity() {
                 cornerRadius = dp(22).toFloat()
             })
             val lp = w.attributes
-            lp.width = (resources.displayMetrics.widthPixels * 0.9f).toInt()
+            // Narrower + shorter leaves tap-outside dead zones on all four sides.
+            lp.width = (resources.displayMetrics.widthPixels * 0.86f).toInt()
             w.attributes = lp
             w.setDimAmount(0.7f)
             if (Build.VERSION.SDK_INT >= 31) {
@@ -757,6 +766,19 @@ class MainActivity : Activity() {
                     f.setInt(attrs, 40)
                     w.attributes = attrs
                 } catch (_: Exception) { /* feature not available on this build */ }
+            }
+        }
+        // Only cap when the content is taller than 75 % of the screen — small
+        // dialogs (turn-off confirm etc.) keep their natural size.
+        dlg.setOnShowListener {
+            val decor = dlg.window?.decorView ?: return@setOnShowListener
+            decor.post {
+                val maxH = (resources.displayMetrics.heightPixels * 0.75f).toInt()
+                if (decor.height > maxH) {
+                    val attrs = dlg.window?.attributes ?: return@post
+                    attrs.height = maxH
+                    dlg.window?.attributes = attrs
+                }
             }
         }
         return dlg
