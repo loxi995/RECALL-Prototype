@@ -130,6 +130,25 @@ object Strings {
         "Privacy policy" to "سياسة الخصوصية",
         "Terms of service" to "شروط الخدمة",
 
+        // Unit abbreviations (used inside formatted numbers)
+        "min" to "د",
+        "sec" to "ث",
+        "hr" to "س",
+        "hour" to "ساعة",
+        "hours" to "ساعات",
+        "day" to "يوم",
+        "days" to "أيام",
+        "of audio" to "من الصوت",
+        "Captured so far" to "تم التسجيل حتى الآن",
+        "Free trial" to "تجربة مجانية",
+        "Paid balance" to "رصيد مدفوع",
+        "sec included" to "ثانية مُدرجة",
+        "Trial" to "تجربة",
+        "Paid" to "مدفوع",
+        "0 seconds" to "٠ ثانية",
+        "No audio captured yet. Wait a few seconds after turning listening on."
+            to "لم يُسجّل أي صوت بعد. انتظر بضع ثوانٍ بعد تشغيل الاستماع.",
+
         // Dialog titles / common buttons
         "BUY MINUTES" to "شراء دقائق",
         "EXTEND BUFFER" to "تمديد نافذة التخزين",

@@ -148,6 +148,8 @@ class MainActivity : Activity() {
     /** Translates [en] to the active language. English keys passed through unchanged. */
     private fun t(en: String): String = Strings.t(this, en)
 
+    private fun tIsAr(): Boolean = Strings.isArabic(this)
+
     /**
      * Writes any uncaught crash to the app's external files directory so we
      * can pull it later. Never silences the crash — the system's crash dialog
@@ -711,6 +713,11 @@ class MainActivity : Activity() {
             )
         )
         setContentView(verticalRoot)
+        // Explicitly set layout direction so RTL mirrors everything (BUY MIN moves
+        // to the top-LEFT, RECALL title aligns right, etc.) even when the system
+        // theme didn't auto-apply it.
+        verticalRoot.layoutDirection =
+            if (tIsAr()) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
         switchToTab(currentTab)
 
         // Switch state + listener
@@ -1942,9 +1949,9 @@ class MainActivity : Activity() {
         val running = AudioCaptureService.isRunning
 
         statusText.text = when {
-            !enabled -> "Listening is off"
-            running -> "Listening"
-            else -> "Starting up…"
+            !enabled -> t("Listening is off")
+            running -> t("Listening")
+            else -> t("Starting up…")
         }
         val dotColor = if (enabled && running) COLOR_STATUS_LIVE else COLOR_STATUS_OFF
         (statusDot.background as? GradientDrawable)?.setColor(dotColor)
@@ -1964,13 +1971,13 @@ class MainActivity : Activity() {
             statusDot.alpha = 1f
         }
 
-        switchStateLabel.text = if (enabled) "ON" else "OFF"
+        switchStateLabel.text = if (enabled) t("ON") else t("OFF")
         switchStateLabel.setTextColor(
             if (enabled) COLOR_STATUS_LIVE else COLOR_TEXT_MUTED
         )
 
         val secs = AudioCaptureService.capturedSeconds(this)
-        capturedText.text = "Captured so far · ${formatDuration(secs)}"
+        capturedText.text = "${t("Captured so far")} · ${formatDuration(secs)}"
     }
 
     private fun updateBalance() {
@@ -1979,15 +1986,20 @@ class MainActivity : Activity() {
         val total = trial + paid
         val m = total / 60
         val s = total % 60
-        balanceBigText.text = String.format(Locale.US, "%d min %02d sec", m, s)
+        balanceBigText.text = String.format(
+            Locale.US, "%d %s %02d %s", m, t("min"), s, t("sec")
+        )
         balanceBigText.setTextColor(
             if (total == 0) 0xFFFF6B6B.toInt() else COLOR_TEXT
         )
         balanceSubText.text = when {
-            trial > 0 && paid == 0 -> "Free trial · ${trial} sec included"
-            trial > 0 && paid > 0 -> "Trial ${trial}s + Paid ${paid / 60}m ${paid % 60}s"
-            trial == 0 && paid > 0 -> "Paid balance · ${paid / 60} min ${paid % 60} sec"
-            else -> "No minutes left — tap BUY MINUTES"
+            trial > 0 && paid == 0 ->
+                "${t("Free trial")} · $trial ${t("sec included")}"
+            trial > 0 && paid > 0 ->
+                "${t("Trial")} ${trial}${t("sec")} + ${t("Paid")} ${paid / 60}${t("min")} ${paid % 60}${t("sec")}"
+            trial == 0 && paid > 0 ->
+                "${t("Paid balance")} · ${paid / 60} ${t("min")} ${paid % 60} ${t("sec")}"
+            else -> t("No minutes left — tap BUY MINUTES")
         }
     }
 
@@ -2006,16 +2018,16 @@ class MainActivity : Activity() {
         val watchdog = WatchdogScheduler.watchdogEnabled(this)
         val weekly = WatchdogScheduler.weeklyEnabled(this)
         alertsTitleText.text = when {
-            watchdog && weekly -> "Watchdog + Weekly"
-            watchdog -> "Watchdog on"
-            weekly -> "Weekly check-in"
-            else -> "All silent"
+            watchdog && weekly -> t("Watchdog + Weekly")
+            watchdog -> t("Watchdog on")
+            weekly -> t("Weekly check-in")
+            else -> t("All silent")
         }
         alertsSubText.text = when {
-            watchdog && weekly -> "Covers outages + long-off nudge"
-            watchdog -> "Pings you only if RECALL stops unexpectedly"
-            weekly -> "Weekly nudge if listening is off"
-            else -> "No alerts — tap to configure"
+            watchdog && weekly -> t("Covers outages + long-off nudge")
+            watchdog -> t("Pings you only if RECALL stops unexpectedly")
+            weekly -> t("Weekly nudge if listening is off")
+            else -> t("No alerts — tap to configure")
         }
     }
 
@@ -2149,9 +2161,11 @@ class MainActivity : Activity() {
     private fun formatBufferHours(hours: Int): String = when {
         hours >= 24 && hours % 24 == 0 -> {
             val days = hours / 24
-            if (days == 1) "1 day of audio" else "$days days of audio"
+            if (days == 1) "1 ${t("day")} ${t("of audio")}"
+            else "$days ${t("days")} ${t("of audio")}"
         }
-        else -> if (hours == 1) "1 hour of audio" else "$hours hours of audio"
+        else -> if (hours == 1) "1 ${t("hour")} ${t("of audio")}"
+            else "$hours ${t("hours")} ${t("of audio")}"
     }
 
     private fun showBufferTierPicker() {
@@ -2407,21 +2421,21 @@ class MainActivity : Activity() {
     }
 
     private fun formatDuration(seconds: Int): String {
-        if (seconds <= 0) return "0 seconds"
+        if (seconds <= 0) return t("0 seconds")
         val h = seconds / 3600
         val m = (seconds % 3600) / 60
         val s = seconds % 60
         val sb = StringBuilder()
-        if (h > 0) sb.append(h).append(" hr")
+        if (h > 0) sb.append(h).append(' ').append(t("hr"))
         if (m > 0) {
             if (sb.isNotEmpty()) sb.append(' ')
-            sb.append(m).append(" min")
+            sb.append(m).append(' ').append(t("min"))
         }
         if (s > 0 && h == 0) {
             if (sb.isNotEmpty()) sb.append(' ')
-            sb.append(s).append(" sec")
+            sb.append(s).append(' ').append(t("sec"))
         }
-        if (sb.isEmpty()) sb.append("0 seconds")
+        if (sb.isEmpty()) sb.append(t("0 seconds"))
         return sb.toString()
     }
 
