@@ -186,6 +186,82 @@ class MainActivity : Activity() {
         } else {
             ensurePermissionsAndStart()
         }
+        // Surface any crash from the last run so we can diagnose it.
+        showLastCrashIfAny()
+    }
+
+    /** Clean cold-restart replacement for recreate() — more robust when switching theme or locale. */
+    private fun restartActivity() {
+        val intent = Intent(this, MainActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+        finish()
+        startActivity(intent)
+        @Suppress("DEPRECATION")
+        overridePendingTransition(0, 0)
+    }
+
+    private fun showLastCrashIfAny() {
+        val dir = getExternalFilesDir(null) ?: return
+        val f = java.io.File(dir, "recall-crash.txt")
+        if (!f.exists() || f.length() == 0L) return
+        val text = try { f.readText() } catch (_: Throwable) { return }
+        // Delete the file so the dialog only shows once per crash.
+        try { f.delete() } catch (_: Throwable) {}
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(22), dp(20), dp(16))
+        }
+        content.addView(TextView(this).apply {
+            text = "LAST CRASH"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+            letterSpacing = 0.1f
+            setPadding(0, 0, 0, dp(10))
+        })
+        content.addView(TextView(this).apply {
+            setText(text)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTextColor(COLOR_TEXT_MUTED)
+            typeface = Typeface.MONOSPACE
+            setPadding(0, 0, 0, dp(14))
+            setTextIsSelectable(true)
+        })
+        var dlgRef: Dialog? = null
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+        }
+        row.addView(TextView(this).apply {
+            setText("COPY")
+            setTextColor(COLOR_ACCENT)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            isClickable = true
+            isFocusable = true
+            background = RippleDrawable(ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE), null, null)
+            setOnClickListener {
+                val cm = getSystemService(android.content.ClipboardManager::class.java)
+                cm?.setPrimaryClip(android.content.ClipData.newPlainText("RECALL crash", text))
+                Toast.makeText(this@MainActivity, "Crash copied to clipboard", Toast.LENGTH_SHORT).show()
+            }
+        })
+        row.addView(TextView(this).apply {
+            setText("DISMISS")
+            setTextColor(COLOR_ACCENT)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            isClickable = true
+            isFocusable = true
+            background = RippleDrawable(ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE), null, null)
+            setOnClickListener { dlgRef?.dismiss() }
+        })
+        content.addView(row)
+        val scroll = ScrollView(this).apply { addView(content) }
+        dlgRef = styledDialog(scroll)
+        dlgRef.show()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -1325,7 +1401,7 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _, checked ->
                 if (checked == isDarkTheme()) return@setOnCheckedChangeListener
                 prefs.edit().putBoolean(KEY_DARK_THEME, checked).apply()
-                handler.post { recreate() }
+                handler.post { restartActivity() }
             }
         }, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -1391,7 +1467,7 @@ class MainActivity : Activity() {
                     this@MainActivity,
                     if (wantAr) Strings.LANG_AR else Strings.LANG_EN
                 )
-                handler.post { recreate() }
+                handler.post { restartActivity() }
             }
         }, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,
