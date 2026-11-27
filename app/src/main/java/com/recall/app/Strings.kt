@@ -149,6 +149,72 @@ object Strings {
         "No audio captured yet. Wait a few seconds after turning listening on."
             to "لم يُسجّل أي صوت بعد. انتظر بضع ثوانٍ بعد تشغيل الاستماع.",
 
+        // Buffer card subtext
+        "Custom window · tap to change" to "نافذة مخصّصة · اضغط للتغيير",
+
+        // Buffer tier picker
+        "How far back should RECALL keep audio on this device? Demo mode — tapping a tier unlocks it instantly."
+            to "إلى أي مدى يحتفظ ريكول بالصوت على جهازك؟ الوضع التجريبي — اضغط على فئة ليتم فتحها فورًا.",
+        "24 hours" to "٢٤ ساعة",
+        "2 days" to "يومان",
+        "3 days" to "٣ أيام",
+        "7 days" to "٧ أيام",
+        "Included" to "مضمنة",
+        "DEFAULT" to "افتراضي",
+        "+1 day" to "+يوم واحد",
+        "+1 DAY" to "+يوم واحد",
+        "MOST POPULAR" to "الأكثر شعبية",
+        "POWER USER" to "للمحترفين",
+        "ACTIVE" to "مفعّل",
+
+        // Alerts picker body + row descriptions
+        "RECALL only notifies you when something actually goes wrong — never 'come back and use the app' nags."
+            to "يُنبّهك ريكول فقط عند حدوث خطأ فعلي — لا رسائل \"عُد لاستخدام التطبيق\" مزعجة.",
+        "Watchdog alert" to "تنبيه المراقبة",
+        "Notify me immediately if RECALL stops listening (OS killed the service, background limit hit, etc.)."
+            to "أخبرني فورًا إذا توقف ريكول عن الاستماع (أُغلقت الخدمة من النظام أو تم تجاوز حد الخلفية، إلخ).",
+        "If I've had RECALL off for 7 days, nudge me once to turn it back on."
+            to "إذا بقي ريكول متوقفًا 7 أيام، ذكّرني مرة لإعادة تشغيله.",
+
+        // Duration picker (stock AlertDialog)
+        "How far back?" to "إلى أي مدى للخلف؟",
+        "Minutes" to "الدقائق",
+        "Seconds" to "الثواني",
+        "Set" to "ضبط",
+        "Cancel" to "إلغاء",
+
+        // Language picker
+        "CHANGE ▸" to "◂ تغيير",
+        "Change language" to "تغيير اللغة",
+        "Pick your preferred language" to "اختر لغتك المفضّلة",
+
+        // HOW TO USE intro + step titles + bodies
+        "RECALL is an audio time machine. It quietly keeps a rolling buffer of ambient sound so you can go back and grab anything you missed."
+            to "ريكول آلة زمن صوتية. يحتفظ بمخزن متجدد من الصوت المحيط بهدوء حتى تتمكن من العودة والتقاط ما فاتك.",
+        "TURN ON LISTENING" to "شغّل الاستماع",
+        "Toggle the Always Listening switch to ON. RECALL starts quietly capturing audio in the background. The green dot in the status bar is an Android privacy indicator — not something RECALL controls."
+            to "فعّل مفتاح \"الاستماع الدائم\". يبدأ ريكول بتسجيل الصوت بهدوء في الخلفية. النقطة الخضراء في شريط الحالة مؤشر خصوصية من أندرويد — ليست شيئًا يتحكم به ريكول.",
+        "LET IT CAPTURE" to "دعه يسجّل",
+        "Keep the app running in the background. You can lock your phone, open other apps — RECALL keeps listening. 'Captured so far' shows how much audio is in the buffer."
+            to "اترك التطبيق يعمل في الخلفية. يمكنك قفل الهاتف أو فتح تطبيقات أخرى — يستمر ريكول في الاستماع. يُظهر \"تم التسجيل حتى الآن\" حجم الصوت في المخزن.",
+        "PICK HOW FAR BACK" to "اختر مدى العودة",
+        "Tap 'How far back' and spin the wheels to choose a duration (30 seconds up to your buffer limit). You can also tap a number to type it directly."
+            to "اضغط على \"إلى أي مدى للخلف\" ودوّر العجلات لاختيار المدة (من 30 ثانية حتى حد المخزن). يمكنك أيضًا الضغط على رقم لإدخاله يدويًا.",
+        "RECOVER THE AUDIO" to "استرجع الصوت",
+        "Tap RECOVER AUDIO. RECALL grabs that slice from the buffer, decodes it, and makes it ready to play."
+            to "اضغط \"استرجاع الصوت\". يأخذ ريكول هذه الشريحة من المخزن ويفكّ ترميزها ويجهّزها للتشغيل.",
+        "PLAY & SAVE" to "تشغيل وحفظ",
+        "Tap PLAY LAST RECOVERY to listen. Tap SAVE TO DEVICE to write it as a WAV file in your Music/RECALL folder — permanent and shareable."
+            to "اضغط \"تشغيل آخر استرجاع\" للاستماع. اضغط \"حفظ على الجهاز\" لحفظه كملف WAV في مجلد Music/RECALL — دائم ويمكن مشاركته.",
+        "Each recovery costs minutes from your balance. New users get a 60-second free trial. Tap +BUY MIN at the top-right to add more."
+            to "كل استرجاع يكلف دقائق من رصيدك. يحصل المستخدمون الجدد على تجربة مجانية مدتها 60 ثانية. اضغط +شراء دقائق في الأعلى لإضافة المزيد.",
+        "EXTEND YOUR BUFFER" to "مدّد نافذة التخزين",
+        "Default is 24 hours of audio kept on-device. Tap the BUFFER WINDOW card to extend up to 7 days (optional upgrade)."
+            to "الافتراضي 24 ساعة من الصوت على الجهاز. اضغط بطاقة \"نافذة التخزين\" للتمديد حتى 7 أيام (ترقية اختيارية).",
+        "TIPS" to "نصائح",
+        "• Add RECALL to your battery-optimization whitelist so Samsung doesn't kill the service in your pocket.\n• Audio never leaves your phone. Uninstalling the app deletes every byte instantly.\n• You are responsible for recording laws in your region — don't use RECALL on people who haven't consented."
+            to "• أضف ريكول إلى قائمة استثناء تحسين البطارية حتى لا يوقف سامسونج الخدمة أثناء وجود الهاتف في جيبك.\n• الصوت لا يغادر هاتفك أبدًا. إلغاء تثبيت التطبيق يحذف كل بايت فورًا.\n• أنت مسؤول عن قوانين التسجيل في منطقتك — لا تستخدم ريكول على أشخاص لم يوافقوا.",
+
         // Dialog titles / common buttons
         "BUY MINUTES" to "شراء دقائق",
         "EXTEND BUFFER" to "تمديد نافذة التخزين",

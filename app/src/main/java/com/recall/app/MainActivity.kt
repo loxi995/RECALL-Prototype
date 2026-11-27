@@ -296,20 +296,31 @@ class MainActivity : Activity() {
             )
         )
 
-        // Header
+        // Header — RECALL title centered horizontally so the floating +BUY MIN
+        // pill (top-left in Arabic / top-right in English) never overlaps it.
         root.addView(TextView(this).apply {
             text = t("RECALL")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 34f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT)
             letterSpacing = -0.02f
+            gravity = Gravity.CENTER_HORIZONTAL
             setPadding(0, 0, 0, dp(2))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         })
         root.addView(TextView(this).apply {
             text = t("Always-on audio buffer · recover anything you missed")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setTextColor(COLOR_TEXT_MUTED)
+            gravity = Gravity.CENTER_HORIZONTAL
             setPadding(0, 0, 0, dp(24))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         })
 
         // Balance card — theme-aware gradient
@@ -1020,7 +1031,10 @@ class MainActivity : Activity() {
         dialogRoot.addView(pickers)
 
         dialogRoot.addView(TextView(this).apply {
-            text = "Minimum 30 seconds. Maximum ${formatBufferHours(bufferHrs)} (buffer window)."
+            text = if (tIsAr())
+                "الحد الأدنى 30 ثانية. الحد الأقصى ${formatBufferHours(bufferHrs)} (نافذة التخزين)."
+            else
+                "Minimum 30 seconds. Maximum ${formatBufferHours(bufferHrs)} (buffer window)."
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(COLOR_TEXT_MUTED)
             gravity = Gravity.CENTER
@@ -1033,9 +1047,9 @@ class MainActivity : Activity() {
         secondsPicker.descendantFocusability = NumberPicker.FOCUS_BEFORE_DESCENDANTS
 
         AlertDialog.Builder(this)
-            .setTitle("How far back?")
+            .setTitle(t("How far back?"))
             .setView(dialogRoot)
-            .setPositiveButton("Set") { _, _ ->
+            .setPositiveButton(t("Set")) { _, _ ->
                 // Commit any in-progress typed value before reading .value
                 minutesPicker.clearFocus()
                 secondsPicker.clearFocus()
@@ -1048,7 +1062,7 @@ class MainActivity : Activity() {
                 }
                 durationBtn.text = formatDuration(durationSec)
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(t("Cancel"), null)
             .show()
     }
 
@@ -1428,7 +1442,7 @@ class MainActivity : Activity() {
             ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply { bottomMargin = dp(16) })
 
-        // Language card
+        // Language card — tap to open a picker (English / Arabic), no toggle.
         val langCard = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -1439,6 +1453,9 @@ class MainActivity : Activity() {
                 cornerRadius = dp(16).toFloat()
             }
             setPadding(dp(18), dp(14), dp(14), dp(14))
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { showLanguagePicker() }
         }
         val langCol = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1461,34 +1478,20 @@ class MainActivity : Activity() {
             setTextColor(COLOR_TEXT)
         })
         langCol.addView(TextView(this).apply {
-            text = t("Switch between English and Arabic")
+            text = t("Change language")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(COLOR_TEXT_MUTED)
             setPadding(0, dp(2), 0, 0)
         })
         langCard.addView(langCol)
-        langCard.addView(Switch(this).apply {
-            isChecked = Strings.isArabic(this@MainActivity)
-            thumbTintList = ColorStateList.valueOf(Color.WHITE)
-            trackTintList = ColorStateList(
-                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                intArrayOf(COLOR_ACCENT, 0xFF4A4A4A.toInt())
-            )
-            setOnCheckedChangeListener { _, checked ->
-                val wantAr = checked
-                if (wantAr == Strings.isArabic(this@MainActivity)) {
-                    return@setOnCheckedChangeListener
-                }
-                Strings.setLang(
-                    this@MainActivity,
-                    if (wantAr) Strings.LANG_AR else Strings.LANG_EN
-                )
-                handler.post { restartActivity() }
-            }
-        }, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { marginStart = dp(12) })
+        langCard.addView(TextView(this).apply {
+            text = t("CHANGE ▸")
+            setTextColor(COLOR_ACCENT)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            letterSpacing = 0.14f
+            setPadding(dp(10), 0, dp(2), 0)
+        })
         root.addView(langCard, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
@@ -1660,7 +1663,7 @@ class MainActivity : Activity() {
                 )
             }
             col.addView(TextView(this).apply {
-                text = step.first
+                text = t(step.first)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(COLOR_TEXT)
@@ -1668,7 +1671,7 @@ class MainActivity : Activity() {
                 setPadding(0, 0, 0, dp(2))
             })
             col.addView(TextView(this).apply {
-                text = step.second
+                text = t(step.second)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                 setTextColor(COLOR_TEXT_MUTED)
                 setLineSpacing(dp(3).toFloat(), 1f)
@@ -1702,9 +1705,11 @@ class MainActivity : Activity() {
             setPadding(0, dp(4), 0, dp(8))
         })
         content.addView(TextView(this).apply {
-            text = t("• Add RECALL to your battery-optimization whitelist so Samsung doesn't kill the service in your pocket.\n") +
+            text = t(
+                "• Add RECALL to your battery-optimization whitelist so Samsung doesn't kill the service in your pocket.\n" +
                 "• Audio never leaves your phone. Uninstalling the app deletes every byte instantly.\n" +
                 "• You are responsible for recording laws in your region — don't use RECALL on people who haven't consented."
+            )
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setTextColor(COLOR_TEXT_MUTED)
             setLineSpacing(dp(4).toFloat(), 1f)
@@ -2008,9 +2013,9 @@ class MainActivity : Activity() {
         bufferTitleText.text = formatBufferHours(hours)
         val tier = Billing.BUFFER_TIERS.find { it.hours == hours }
         bufferSubText.text = when {
-            tier == null -> "Custom window · tap to change"
-            tier.hours == Billing.BUFFER_TIERS[0].hours -> "Default · tap to extend further"
-            else -> "Extended · tap to change"
+            tier == null -> t("Custom window · tap to change")
+            tier.hours == Billing.BUFFER_TIERS[0].hours -> t("Default · tap to extend further")
+            else -> t("Extended · tap to change")
         }
     }
 
@@ -2029,6 +2034,114 @@ class MainActivity : Activity() {
             weekly -> t("Weekly nudge if listening is off")
             else -> t("No alerts — tap to configure")
         }
+    }
+
+    private fun showLanguagePicker() {
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(22), dp(20), dp(16))
+        }
+        content.addView(TextView(this).apply {
+            text = t("Change language")
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+            letterSpacing = 0.1f
+            setPadding(0, 0, 0, dp(6))
+        })
+        content.addView(TextView(this).apply {
+            text = t("Pick your preferred language")
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setPadding(0, 0, 0, dp(16))
+        })
+
+        var dlgRef: Dialog? = null
+        val options = listOf(
+            Strings.LANG_EN to t("English"),
+            Strings.LANG_AR to t("Arabic"),
+        )
+        val currentLang = Strings.current(this)
+
+        for ((code, label) in options) {
+            val isCurrent = (code == currentLang)
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                background = RippleDrawable(
+                    ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE),
+                    GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        setColor(Color.TRANSPARENT)
+                        setStroke(dp(if (isCurrent) 2 else 1),
+                            if (isCurrent) COLOR_STATUS_LIVE else COLOR_DIVIDER)
+                        cornerRadius = dp(14).toFloat()
+                    },
+                    GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        setColor(Color.WHITE)
+                        cornerRadius = dp(14).toFloat()
+                    }
+                )
+                setPadding(dp(16), dp(14), dp(16), dp(14))
+                isClickable = true
+                isFocusable = true
+            }
+            row.addView(TextView(this).apply {
+                text = label
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(COLOR_TEXT)
+                layoutParams = LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+                )
+            })
+            if (isCurrent) {
+                row.addView(TextView(this).apply {
+                    text = t("ACTIVE")
+                    setTextColor(COLOR_STATUS_LIVE)
+                    setTypeface(typeface, Typeface.BOLD)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+                    letterSpacing = 0.14f
+                })
+            }
+            row.setOnClickListener {
+                dlgRef?.dismiss()
+                if (code != currentLang) {
+                    Strings.setLang(this@MainActivity, code)
+                    handler.post { restartActivity() }
+                }
+            }
+            content.addView(row, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(10) })
+        }
+
+        val closeRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+            setPadding(0, dp(6), 0, 0)
+        }
+        closeRow.addView(TextView(this).apply {
+            text = t("CLOSE")
+            setTextColor(COLOR_ACCENT)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            letterSpacing = 0.14f
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            isClickable = true
+            isFocusable = true
+            background = RippleDrawable(
+                ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE), null, null
+            )
+            setOnClickListener { dlgRef?.dismiss() }
+        })
+        content.addView(closeRow)
+
+        val scroll = ScrollView(this).apply { addView(content) }
+        dlgRef = styledDialog(scroll)
+        dlgRef.show()
     }
 
     private fun showAlertsPicker() {
@@ -2053,8 +2166,8 @@ class MainActivity : Activity() {
         })
 
         content.addView(alertSwitchRow(
-            title = "Watchdog alert",
-            body = "Notify me immediately if RECALL stops listening (OS killed the service, background limit hit, etc.).",
+            title = t("Watchdog alert"),
+            body = t("Notify me immediately if RECALL stops listening (OS killed the service, background limit hit, etc.)."),
             checked = WatchdogScheduler.watchdogEnabled(this),
             onChange = { on ->
                 WatchdogScheduler.setWatchdogEnabled(this, on)
@@ -2062,8 +2175,8 @@ class MainActivity : Activity() {
             }
         ))
         content.addView(alertSwitchRow(
-            title = "Weekly check-in",
-            body = "If I've had RECALL off for 7 days, nudge me once to turn it back on.",
+            title = t("Weekly check-in"),
+            body = t("If I've had RECALL off for 7 days, nudge me once to turn it back on."),
             checked = WatchdogScheduler.weeklyEnabled(this),
             onChange = { on ->
                 WatchdogScheduler.setWeeklyEnabled(this, on)
@@ -2227,14 +2340,14 @@ class MainActivity : Activity() {
                 )
             }
             leftCol.addView(TextView(this).apply {
-                text = tier.label
+                text = t(tier.label)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(COLOR_TEXT)
             })
             tier.badge?.let {
                 leftCol.addView(TextView(this).apply {
-                    text = if (isCurrent) "ACTIVE" else it.uppercase(Locale.US)
+                    text = if (isCurrent) t("ACTIVE") else t(it.uppercase(Locale.US))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
                     setTypeface(typeface, Typeface.BOLD)
                     setTextColor(
@@ -2250,7 +2363,8 @@ class MainActivity : Activity() {
             }
             row.addView(leftCol)
             row.addView(TextView(this).apply {
-                text = tier.priceUsd
+                // "$4.99" etc pass through unchanged; "Included" gets translated.
+                text = t(tier.priceUsd)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(COLOR_TEXT)
