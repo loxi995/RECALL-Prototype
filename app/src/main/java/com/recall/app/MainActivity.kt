@@ -13,6 +13,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -129,6 +130,24 @@ class MainActivity : Activity() {
     private val COLOR_ACCENT_RIPPLE: Int get() =
         if (isDarkTheme()) DARK_ACCENT_RIPPLE else LIGHT_ACCENT_RIPPLE
 
+    /**
+     * Applies the user's language choice before anything is inflated. Switching
+     * to Arabic via setLang() + recreate() triggers this and Android will mirror
+     * the whole layout to RTL automatically.
+     */
+    override fun attachBaseContext(newBase: Context) {
+        val lang = newBase.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(Strings.KEY_LANG, Strings.LANG_EN) ?: Strings.LANG_EN
+        val locale = java.util.Locale(lang)
+        java.util.Locale.setDefault(locale)
+        val config = Configuration(newBase.resources.configuration)
+        config.setLocale(locale)
+        super.attachBaseContext(newBase.createConfigurationContext(config))
+    }
+
+    /** Translates [en] to the active language. English keys passed through unchanged. */
+    private fun t(en: String): String = Strings.t(this, en)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -173,7 +192,7 @@ class MainActivity : Activity() {
 
         // Header
         root.addView(TextView(this).apply {
-            text = "RECALL"
+            text = t("RECALL")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 34f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT)
@@ -181,7 +200,7 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(2))
         })
         root.addView(TextView(this).apply {
-            text = "Always-on audio buffer · recover anything you missed"
+            text = t("Always-on audio buffer · recover anything you missed")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setTextColor(COLOR_TEXT_MUTED)
             setPadding(0, 0, 0, dp(24))
@@ -206,7 +225,7 @@ class MainActivity : Activity() {
             setPadding(dp(18), dp(14), dp(14), dp(14))
         }
         balanceCard.addView(TextView(this).apply {
-            text = "YOUR BALANCE"
+            text = t("YOUR BALANCE")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT_MUTED)
@@ -311,7 +330,7 @@ class MainActivity : Activity() {
             )
         }
         switchLabels.addView(TextView(this).apply {
-            text = "Always listening"
+            text = t("Always listening")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT)
@@ -371,7 +390,7 @@ class MainActivity : Activity() {
             )
         }
         bufferCol.addView(TextView(this).apply {
-            text = "BUFFER WINDOW"
+            text = t("BUFFER WINDOW")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT_MUTED)
@@ -392,7 +411,7 @@ class MainActivity : Activity() {
         bufferCol.addView(bufferSubText)
         bufferCard.addView(bufferCol)
         bufferCard.addView(TextView(this).apply {
-            text = "EXTEND ▸"
+            text = t("EXTEND ▸")
             setTextColor(COLOR_ACCENT)
             setTypeface(typeface, Typeface.BOLD)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
@@ -426,7 +445,7 @@ class MainActivity : Activity() {
             )
         }
         alertsCol.addView(TextView(this).apply {
-            text = "ALERTS"
+            text = t("ALERTS")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT_MUTED)
@@ -447,7 +466,7 @@ class MainActivity : Activity() {
         alertsCol.addView(alertsSubText)
         alertsCard.addView(alertsCol)
         alertsCard.addView(TextView(this).apply {
-            text = "CHANGE ▸"
+            text = t("CHANGE ▸")
             setTextColor(COLOR_ACCENT)
             setTypeface(typeface, Typeface.BOLD)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
@@ -461,7 +480,7 @@ class MainActivity : Activity() {
 
         // Duration section
         root.addView(TextView(this).apply {
-            text = "How far back"
+            text = t("How far back")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setTextColor(COLOR_TEXT_MUTED)
             setPadding(0, 0, 0, dp(8))
@@ -470,20 +489,20 @@ class MainActivity : Activity() {
         root.addView(durationBtn)
 
         // Primary action: Recover
-        recoverBtn = primaryBtn("RECOVER AUDIO") { recoverAudio() }
+        recoverBtn = primaryBtn(t("RECOVER AUDIO")) { recoverAudio() }
         root.addView(recoverBtn, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(56)
         ).apply { topMargin = dp(16) })
 
         // Alternate flow: pick an explicit start / end time instead of "last N"
-        root.addView(secondaryBtn("OR PICK A SPECIFIC TIME RANGE") { showTimeRangePicker() })
+        root.addView(secondaryBtn(t("OR PICK A SPECIFIC TIME RANGE")) { showTimeRangePicker() })
 
         // Playback (state-aware)
-        playBtn = secondaryBtn("PLAY LAST RECOVERY") { togglePlayRecovery() }
+        playBtn = secondaryBtn(t("PLAY LAST RECOVERY")) { togglePlayRecovery() }
         root.addView(playBtn)
 
         // Save to device
-        saveBtn = secondaryBtn("SAVE TO DEVICE") { saveRecoveryToDevice() }
+        saveBtn = secondaryBtn(t("SAVE TO DEVICE")) { saveRecoveryToDevice() }
         root.addView(saveBtn)
 
         // How to use link
@@ -493,7 +512,7 @@ class MainActivity : Activity() {
             setPadding(0, dp(22), 0, 0)
         }
         helpRow.addView(TextView(this).apply {
-            text = "HOW TO USE RECALL"
+            text = t("HOW TO USE RECALL")
             setTextColor(COLOR_ACCENT)
             setTypeface(typeface, Typeface.BOLD)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
@@ -511,7 +530,7 @@ class MainActivity : Activity() {
         // Footer
         root.addView(hairline(dp(28), dp(16)))
         root.addView(TextView(this).apply {
-            text = "Audio stays on this device.\nNothing is uploaded or shared."
+            text = t("Audio stays on this device.\nNothing is uploaded or shared.")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(COLOR_TEXT_MUTED)
             gravity = Gravity.CENTER_HORIZONTAL
@@ -723,7 +742,7 @@ class MainActivity : Activity() {
             cornerRadius = radius
         }
         return Button(this).apply {
-            text = "+ BUY MIN"
+            text = t("+ BUY MIN")
             setTextColor(COLOR_ACCENT)
             background = RippleDrawable(
                 ColorStateList.valueOf(COLOR_ACCENT_RIPPLE),
@@ -842,7 +861,7 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
         }
         headers.addView(TextView(this).apply {
-            text = "Minutes"
+            text = t("Minutes")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(COLOR_TEXT_MUTED)
             letterSpacing = 0.08f
@@ -850,7 +869,7 @@ class MainActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         })
         headers.addView(TextView(this).apply {
-            text = "Seconds"
+            text = t("Seconds")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(COLOR_TEXT_MUTED)
             letterSpacing = 0.08f
@@ -925,7 +944,7 @@ class MainActivity : Activity() {
         }
 
         content.addView(TextView(this).apply {
-            text = "WELCOME TO RECALL"
+            text = t("WELCOME TO RECALL")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT)
@@ -934,7 +953,7 @@ class MainActivity : Activity() {
         })
 
         content.addView(TextView(this).apply {
-            text = "RECALL continuously captures audio from your microphone while listening is ON. This powers the recovery feature — the ability to get back the last several hours (or days) of ambient sound on demand."
+            text = t("RECALL continuously captures audio from your microphone while listening is ON. This powers the recovery feature — the ability to get back the last several hours (or days) of ambient sound on demand.")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setTextColor(COLOR_TEXT_MUTED)
             setLineSpacing(dp(3).toFloat(), 1f)
@@ -942,7 +961,7 @@ class MainActivity : Activity() {
         })
 
         content.addView(TextView(this).apply {
-            text = "HOW YOUR AUDIO IS HANDLED"
+            text = t("HOW YOUR AUDIO IS HANDLED")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT_MUTED)
@@ -950,7 +969,7 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(6))
         })
         content.addView(TextView(this).apply {
-            text = "• Stored only on this device, in RECALL's private app storage\n" +
+            text = t("• Stored only on this device, in RECALL's private app storage\n") +
                 "• Overwritten automatically on a rolling schedule\n" +
                 "• Never uploaded, transmitted, or shared with anyone\n" +
                 "• Deleted entirely when you uninstall the app"
@@ -961,7 +980,7 @@ class MainActivity : Activity() {
         })
 
         content.addView(TextView(this).apply {
-            text = "YOUR RESPONSIBILITY"
+            text = t("YOUR RESPONSIBILITY")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT_MUTED)
@@ -969,7 +988,7 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(6))
         })
         content.addView(TextView(this).apply {
-            text = "Audio-recording laws vary by region. In many places it is illegal to record a conversation without the consent of every participant. You are solely responsible for complying with the laws that apply to you."
+            text = t("Audio-recording laws vary by region. In many places it is illegal to record a conversation without the consent of every participant. You are solely responsible for complying with the laws that apply to you.")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setTextColor(COLOR_TEXT_MUTED)
             setLineSpacing(dp(4).toFloat(), 1f)
@@ -990,7 +1009,7 @@ class MainActivity : Activity() {
         content.addView(linkRow)
 
         content.addView(TextView(this).apply {
-            text = "By tapping Agree & Continue you accept the Privacy Policy and Terms of Service."
+            text = t("By tapping Agree & Continue you accept the Privacy Policy and Terms of Service.")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             setTextColor(COLOR_TEXT_MUTED)
             setPadding(0, 0, 0, dp(20))
@@ -999,7 +1018,7 @@ class MainActivity : Activity() {
         var dlgRef: Dialog? = null
         // Stacked buttons — primary agree on top, ghost exit below. Full-width
         // keeps the "I AGREE" label on one line on every screen size.
-        val agreeBtn = primaryBtn("I AGREE") {
+        val agreeBtn = primaryBtn(t("I AGREE")) {
             prefs.edit().putBoolean(KEY_TERMS, true).apply()
             dlgRef?.dismiss()
             ensurePermissionsAndStart()
@@ -1009,7 +1028,7 @@ class MainActivity : Activity() {
         )
         content.addView(agreeBtn)
 
-        val exitBtn = secondaryBtn("Exit") {
+        val exitBtn = secondaryBtn(t("Exit")) {
             dlgRef?.dismiss()
             finish()
         }
@@ -1044,9 +1063,9 @@ class MainActivity : Activity() {
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(1)
             )
         })
-        navHomeBtn = buildNavTab("HOME", R.drawable.ic_nav_home, 0)
-        navSearchBtn = buildNavTab("SEARCH", R.drawable.ic_nav_search, 1)
-        navProfileBtn = buildNavTab("PROFILE", R.drawable.ic_nav_profile, 2)
+        navHomeBtn = buildNavTab(t("HOME"), R.drawable.ic_nav_home, 0)
+        navSearchBtn = buildNavTab(t("SEARCH"), R.drawable.ic_nav_search, 1)
+        navProfileBtn = buildNavTab(t("PROFILE"), R.drawable.ic_nav_profile, 2)
         nav.addView(navHomeBtn, LinearLayout.LayoutParams(
             0, LinearLayout.LayoutParams.MATCH_PARENT, 1f
         ))
@@ -1156,7 +1175,7 @@ class MainActivity : Activity() {
         ))
 
         root.addView(TextView(this).apply {
-            text = "SEARCH"
+            text = t("SEARCH")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 34f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT)
@@ -1164,20 +1183,20 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(2))
         })
         root.addView(TextView(this).apply {
-            text = "Find a specific moment in your rolling buffer"
+            text = t("Find a specific moment in your rolling buffer")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setTextColor(COLOR_TEXT_MUTED)
             setPadding(0, 0, 0, dp(24))
         })
 
         // Quick action: open the time-range picker
-        root.addView(primaryBtn("PICK A TIME RANGE") { showTimeRangePicker() },
+        root.addView(primaryBtn(t("PICK A TIME RANGE")) { showTimeRangePicker() },
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(56)
             ))
 
         root.addView(TextView(this).apply {
-            text = "Pick a start and end time in your local timezone. RECALL returns exactly that slice from the on-device buffer."
+            text = t("Pick a start and end time in your local timezone. RECALL returns exactly that slice from the on-device buffer.")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setTextColor(COLOR_TEXT_MUTED)
             setLineSpacing(dp(3).toFloat(), 1f)
@@ -1186,7 +1205,7 @@ class MainActivity : Activity() {
 
         root.addView(hairline(dp(0), dp(16)))
         root.addView(TextView(this).apply {
-            text = "SAVED RECOVERIES"
+            text = t("SAVED RECOVERIES")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT_MUTED)
@@ -1194,7 +1213,7 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(10))
         })
         root.addView(TextView(this).apply {
-            text = "WAV files you've exported via SAVE TO DEVICE appear in your Music folder under RECALL. Open any file manager or music app to browse them — this list view is coming soon."
+            text = t("WAV files you've exported via SAVE TO DEVICE appear in your Music folder under RECALL. Open any file manager or music app to browse them — this list view is coming soon.")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setTextColor(COLOR_TEXT_MUTED)
             setLineSpacing(dp(3).toFloat(), 1f)
@@ -1217,7 +1236,7 @@ class MainActivity : Activity() {
         ))
 
         root.addView(TextView(this).apply {
-            text = "PROFILE"
+            text = t("PROFILE")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 34f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT)
@@ -1225,7 +1244,7 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(2))
         })
         root.addView(TextView(this).apply {
-            text = "Account, settings, and quick links"
+            text = t("Account, settings, and quick links")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setTextColor(COLOR_TEXT_MUTED)
             setPadding(0, 0, 0, dp(24))
@@ -1250,7 +1269,7 @@ class MainActivity : Activity() {
             )
         }
         themeCol.addView(TextView(this).apply {
-            text = "APPEARANCE"
+            text = t("APPEARANCE")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT_MUTED)
@@ -1258,13 +1277,13 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(4))
         })
         themeCol.addView(TextView(this).apply {
-            text = if (isDarkTheme()) "Dark mode" else "Light mode"
+            text = if (isDarkTheme()) t("Dark mode") else t("Light mode")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT)
         })
         themeCol.addView(TextView(this).apply {
-            text = "Toggle to switch between dark and light themes"
+            text = t("Toggle to switch between dark and light themes")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(COLOR_TEXT_MUTED)
             setPadding(0, dp(2), 0, 0)
@@ -1291,21 +1310,83 @@ class MainActivity : Activity() {
         root.addView(themeCard, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(16) })
+
+        // Language card
+        val langCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(Color.TRANSPARENT)
+                setStroke(dp(1), COLOR_DIVIDER)
+                cornerRadius = dp(16).toFloat()
+            }
+            setPadding(dp(18), dp(14), dp(14), dp(14))
+        }
+        val langCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+            )
+        }
+        langCol.addView(TextView(this).apply {
+            text = t("LANGUAGE")
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT_MUTED)
+            letterSpacing = 0.14f
+            setPadding(0, 0, 0, dp(4))
+        })
+        langCol.addView(TextView(this).apply {
+            text = if (Strings.isArabic(this@MainActivity)) t("Arabic") else t("English")
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+        })
+        langCol.addView(TextView(this).apply {
+            text = t("Switch between English and Arabic")
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setPadding(0, dp(2), 0, 0)
+        })
+        langCard.addView(langCol)
+        langCard.addView(Switch(this).apply {
+            isChecked = Strings.isArabic(this@MainActivity)
+            thumbTintList = ColorStateList.valueOf(Color.WHITE)
+            trackTintList = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(COLOR_ACCENT, 0xFF4A4A4A.toInt())
+            )
+            setOnCheckedChangeListener { _, checked ->
+                Strings.setLang(
+                    this@MainActivity,
+                    if (checked) Strings.LANG_AR else Strings.LANG_EN
+                )
+                recreate()
+            }
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { marginStart = dp(12) })
+        root.addView(langCard, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply { bottomMargin = dp(20) })
 
         // Quick links
-        root.addView(profileLinkRow("How to use RECALL") { showHelpDialog() })
-        root.addView(profileLinkRow("Buy minutes") { showPackPicker() })
-        root.addView(profileLinkRow("Extend buffer window") { showBufferTierPicker() })
-        root.addView(profileLinkRow("Configure alerts") { showAlertsPicker() })
+        root.addView(profileLinkRow(t("How to use RECALL")) { showHelpDialog() })
+        root.addView(profileLinkRow(t("Buy minutes")) { showPackPicker() })
+        root.addView(profileLinkRow(t("Extend buffer window")) { showBufferTierPicker() })
+        root.addView(profileLinkRow(t("Configure alerts")) { showAlertsPicker() })
         root.addView(hairline(dp(20), dp(20)))
 
         // Legal
-        root.addView(profileLinkRow("Privacy policy") {
+        root.addView(profileLinkRow(t("Privacy policy")) {
             try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_POLICY_URL))) }
             catch (_: Exception) {}
         })
-        root.addView(profileLinkRow("Terms of service") {
+        root.addView(profileLinkRow(t("Terms of service")) {
             try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(TERMS_URL))) }
             catch (_: Exception) {}
         })
@@ -1357,7 +1438,7 @@ class MainActivity : Activity() {
                 )
             })
             addView(TextView(context).apply {
-                text = "▸"
+                text = t("▸")
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                 setTextColor(COLOR_TEXT_MUTED)
             })
@@ -1376,7 +1457,7 @@ class MainActivity : Activity() {
         }
 
         content.addView(TextView(this).apply {
-            text = "HOW TO USE RECALL"
+            text = t("HOW TO USE RECALL")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT)
@@ -1384,7 +1465,7 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(6))
         })
         content.addView(TextView(this).apply {
-            text = "RECALL is an audio time machine. It quietly keeps a rolling buffer of ambient sound so you can go back and grab anything you missed."
+            text = t("RECALL is an audio time machine. It quietly keeps a rolling buffer of ambient sound so you can go back and grab anything you missed.")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setTextColor(COLOR_TEXT_MUTED)
             setLineSpacing(dp(3).toFloat(), 1f)
@@ -1493,7 +1574,7 @@ class MainActivity : Activity() {
         }
 
         content.addView(TextView(this).apply {
-            text = "TIPS"
+            text = t("TIPS")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT_MUTED)
@@ -1501,7 +1582,7 @@ class MainActivity : Activity() {
             setPadding(0, dp(4), 0, dp(8))
         })
         content.addView(TextView(this).apply {
-            text = "• Add RECALL to your battery-optimization whitelist so Samsung doesn't kill the service in your pocket.\n" +
+            text = t("• Add RECALL to your battery-optimization whitelist so Samsung doesn't kill the service in your pocket.\n") +
                 "• Audio never leaves your phone. Uninstalling the app deletes every byte instantly.\n" +
                 "• You are responsible for recording laws in your region — don't use RECALL on people who haven't consented."
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
@@ -1516,7 +1597,7 @@ class MainActivity : Activity() {
             gravity = Gravity.END
         }
         closeRow.addView(TextView(this).apply {
-            text = "GOT IT"
+            text = t("GOT IT")
             setTextColor(COLOR_ACCENT)
             setTypeface(typeface, Typeface.BOLD)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
@@ -1666,7 +1747,7 @@ class MainActivity : Activity() {
             setPadding(dp(22), dp(24), dp(22), dp(18))
         }
         content.addView(TextView(this).apply {
-            text = "TURN RECALL OFF?"
+            text = t("TURN RECALL OFF?")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT)
@@ -1674,7 +1755,7 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(12))
         })
         content.addView(TextView(this).apply {
-            text = "If you turn RECALL off, you won't be able to recover audio from any conversation, meeting, class, or moment you forget to record."
+            text = t("If you turn RECALL off, you won't be able to recover audio from any conversation, meeting, class, or moment you forget to record.")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setTextColor(COLOR_TEXT_MUTED)
             setLineSpacing(dp(3).toFloat(), 1f)
@@ -1686,13 +1767,13 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.END
         }
-        val keep = secondaryBtn("Keep listening") { dlgRef?.dismiss() }
+        val keep = secondaryBtn(t("Keep listening")) { dlgRef?.dismiss() }
         keep.layoutParams = LinearLayout.LayoutParams(
             0, dp(48), 1f
         ).apply { marginEnd = dp(10) }
         row.addView(keep)
 
-        val off = dangerBtn("Turn off") {
+        val off = dangerBtn(t("Turn off")) {
             prefs.edit().putBoolean(KEY_ENABLED, false).apply()
             // Start the weekly-check-in clock from now so the alert (if opted in)
             // only nudges the user after 7 full days off.
@@ -1831,7 +1912,7 @@ class MainActivity : Activity() {
             setPadding(dp(20), dp(22), dp(20), dp(16))
         }
         content.addView(TextView(this).apply {
-            text = "ALERTS"
+            text = t("ALERTS")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT)
@@ -1839,7 +1920,7 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(4))
         })
         content.addView(TextView(this).apply {
-            text = "RECALL only notifies you when something actually goes wrong — never \"come back and use the app\" nags."
+            text = t("RECALL only notifies you when something actually goes wrong — never \")come back and use the app\" nags."
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(COLOR_TEXT_MUTED)
             setPadding(0, 0, 0, dp(18))
@@ -1872,7 +1953,7 @@ class MainActivity : Activity() {
             setPadding(0, dp(6), 0, 0)
         }
         closeRow.addView(TextView(this).apply {
-            text = "DONE"
+            text = t("DONE")
             setTextColor(COLOR_ACCENT)
             setTypeface(typeface, Typeface.BOLD)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
@@ -1966,7 +2047,7 @@ class MainActivity : Activity() {
             setPadding(dp(20), dp(22), dp(20), dp(16))
         }
         container.addView(TextView(this).apply {
-            text = "EXTEND BUFFER"
+            text = t("EXTEND BUFFER")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT)
@@ -1974,7 +2055,7 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(4))
         })
         container.addView(TextView(this).apply {
-            text = "How far back should RECALL keep audio on this device? Demo mode — tapping a tier unlocks it instantly."
+            text = t("How far back should RECALL keep audio on this device? Demo mode — tapping a tier unlocks it instantly.")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(COLOR_TEXT_MUTED)
             setPadding(0, 0, 0, dp(16))
@@ -2071,7 +2152,7 @@ class MainActivity : Activity() {
             setPadding(0, dp(6), 0, 0)
         }
         closeRow.addView(TextView(this).apply {
-            text = "CLOSE"
+            text = t("CLOSE")
             setTextColor(COLOR_ACCENT)
             setTypeface(typeface, Typeface.BOLD)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
@@ -2097,7 +2178,7 @@ class MainActivity : Activity() {
             setPadding(dp(20), dp(22), dp(20), dp(16))
         }
         container.addView(TextView(this).apply {
-            text = "BUY MINUTES"
+            text = t("BUY MINUTES")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT)
@@ -2105,7 +2186,7 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(4))
         })
         container.addView(TextView(this).apply {
-            text = "Demo mode — tapping a pack simulates a purchase and credits your balance instantly. Google Play Billing will be wired in before public launch."
+            text = t("Demo mode — tapping a pack simulates a purchase and credits your balance instantly. Google Play Billing will be wired in before public launch.")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(COLOR_TEXT_MUTED)
             setPadding(0, 0, 0, dp(16))
@@ -2189,7 +2270,7 @@ class MainActivity : Activity() {
             setPadding(0, dp(6), 0, 0)
         }
         val closeBtn = TextView(this).apply {
-            text = "CLOSE"
+            text = t("CLOSE")
             setTextColor(COLOR_ACCENT)
             setTypeface(typeface, Typeface.BOLD)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
@@ -2301,7 +2382,7 @@ class MainActivity : Activity() {
             setPadding(dp(20), dp(22), dp(20), dp(16))
         }
         content.addView(TextView(this).apply {
-            text = "RECOVER TIME RANGE"
+            text = t("RECOVER TIME RANGE")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT)
@@ -2309,7 +2390,7 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(4))
         })
         content.addView(TextView(this).apply {
-            text = "Pick the exact time window the audio you want is from. Times are in your local timezone."
+            text = t("Pick the exact time window the audio you want is from. Times are in your local timezone.")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setTextColor(COLOR_TEXT_MUTED)
             setLineSpacing(dp(2).toFloat(), 1f)
@@ -2317,7 +2398,7 @@ class MainActivity : Activity() {
         })
 
         content.addView(TextView(this).apply {
-            text = "START"
+            text = t("START")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT_MUTED)
@@ -2328,7 +2409,7 @@ class MainActivity : Activity() {
         content.addView(startBtn)
 
         content.addView(TextView(this).apply {
-            text = "END"
+            text = t("END")
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(COLOR_TEXT_MUTED)
@@ -2386,7 +2467,7 @@ class MainActivity : Activity() {
         }
 
         var dlgRef: Dialog? = null
-        val recoverBtn = primaryBtn("RECOVER THIS RANGE") {
+        val recoverBtn = primaryBtn(t("RECOVER THIS RANGE")) {
             if (endMs <= startMs || (endMs - startMs) < 30_000L) {
                 Toast.makeText(
                     this,
@@ -2403,7 +2484,7 @@ class MainActivity : Activity() {
         ).apply { topMargin = dp(16) }
         content.addView(recoverBtn)
 
-        val cancelBtn = secondaryBtn("Cancel") { dlgRef?.dismiss() }
+        val cancelBtn = secondaryBtn(t("Cancel")) { dlgRef?.dismiss() }
         cancelBtn.layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, dp(48)
         ).apply { topMargin = dp(10) }
