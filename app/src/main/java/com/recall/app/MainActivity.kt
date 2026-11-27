@@ -204,7 +204,7 @@ class MainActivity : Activity() {
         val dir = getExternalFilesDir(null) ?: return
         val f = java.io.File(dir, "recall-crash.txt")
         if (!f.exists() || f.length() == 0L) return
-        val text = try { f.readText() } catch (_: Throwable) { return }
+        val crashText = try { f.readText() } catch (_: Throwable) { return }
         // Delete the file so the dialog only shows once per crash.
         try { f.delete() } catch (_: Throwable) {}
         val content = LinearLayout(this).apply {
@@ -220,7 +220,7 @@ class MainActivity : Activity() {
             setPadding(0, 0, 0, dp(10))
         })
         content.addView(TextView(this).apply {
-            setText(text)
+            text = crashText
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             setTextColor(COLOR_TEXT_MUTED)
             typeface = Typeface.MONOSPACE
@@ -233,7 +233,7 @@ class MainActivity : Activity() {
             gravity = Gravity.END
         }
         row.addView(TextView(this).apply {
-            setText("COPY")
+            text = "COPY"
             setTextColor(COLOR_ACCENT)
             setTypeface(typeface, Typeface.BOLD)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
@@ -243,12 +243,12 @@ class MainActivity : Activity() {
             background = RippleDrawable(ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE), null, null)
             setOnClickListener {
                 val cm = getSystemService(android.content.ClipboardManager::class.java)
-                cm?.setPrimaryClip(android.content.ClipData.newPlainText("RECALL crash", text))
+                cm?.setPrimaryClip(android.content.ClipData.newPlainText("RECALL crash", crashText))
                 Toast.makeText(this@MainActivity, "Crash copied to clipboard", Toast.LENGTH_SHORT).show()
             }
         })
         row.addView(TextView(this).apply {
-            setText("DISMISS")
+            text = "DISMISS"
             setTextColor(COLOR_ACCENT)
             setTypeface(typeface, Typeface.BOLD)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
