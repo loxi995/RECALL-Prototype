@@ -43,7 +43,7 @@ class SplashActivity : Activity() {
                 setColor(0xFF0A0A0A.toInt())
                 cornerRadius = dp(26).toFloat()
             }
-            layoutParams = LinearLayout.LayoutParams(dp(130), dp(130))
+            layoutParams = LinearLayout.LayoutParams(dp(96), dp(96))
             alpha = 0f
             scaleX = 0.6f
             scaleY = 0.6f

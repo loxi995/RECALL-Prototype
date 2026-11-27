@@ -4,17 +4,13 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Equalizer bars on the left: 5 thin white bars of varying heights -->
+    <!-- Equalizer bars on the left (4 thin vertical bars, varying heights) -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M8,48 h3 v12 h-3 z M14,38 h3 v32 h-3 z M20,42 h3 v24 h-3 z M26,33 h3 v42 h-3 z M32,45 h3 v18 h-3 z" />
-    <!-- Bold rounded R, positioned center-right so the equalizer sits beside it -->
+        android:pathData="M27,47 h2 v14 h-2 z M32,41 h2 v26 h-2 z M37,45 h2 v18 h-2 z M42,39 h2 v30 h-2 z" />
+    <!-- Bold rounded R, compact — everything fits inside the adaptive-icon safe zone -->
     <path
         android:fillColor="#FFFFFF"
         android:fillType="evenOdd"
-        android:pathData="M40,25 L67,25 C78,25 84,33 84,43 C84,51 79,58 70,60 L83,85 L72,85 L60,60 L53,60 L53,85 L40,85 Z M53,36 L65,36 C70,36 73,39 73,43 C73,47 70,49 65,49 L53,49 Z" />
-    <!-- Red record dot at the top-right of the R -->
-    <path
-        android:fillColor="#E53935"
-        android:pathData="M79,26 A4,4 0 1 0 79,34 A4,4 0 1 0 79,26 Z" />
+        android:pathData="M46,28 L65,28 C73,28 78,34 78,42 C78,50 73,56 65,57 L78,80 L69,80 L58,58 L56,58 L56,80 L46,80 Z M56,37 L64,37 C68,37 70,39 70,42 C70,45 68,48 64,48 L56,48 Z" />
 </vector>
