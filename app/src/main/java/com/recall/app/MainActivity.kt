@@ -31,6 +31,7 @@ import android.provider.Settings
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
@@ -40,6 +41,7 @@ import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.CompoundButton
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.NumberPicker
@@ -97,6 +99,10 @@ class MainActivity : Activity() {
     private lateinit var navHomeBtn: LinearLayout
     private lateinit var navSearchBtn: LinearLayout
     private lateinit var navProfileBtn: LinearLayout
+    // Horizontally-paging container holding the 3 tab views side by side
+    private lateinit var pagerScroll: HorizontalScrollView
+    private lateinit var pagerContent: LinearLayout
+    private var pagerLastScrollX = -1
 
     // Theme-aware color accessors. Existing code referencing COLOR_BG etc.
     // continues to work — Kotlin resolves the property on `this`, ignoring the
@@ -513,28 +519,57 @@ class MainActivity : Activity() {
             setLineSpacing(dp(4).toFloat(), 1f)
         })
 
-        // Three-tab shell: Home (existing content) + Search + Profile
+        // Horizontal pager: Home + Search + Profile side-by-side, swipeable
+        tabHome = scroll
+        tabSearch = buildSearchContent()
+        tabProfile = buildProfileContent()
+
+        val initialPageWidth = resources.displayMetrics.widthPixels
+        pagerContent = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+        pagerContent.addView(tabHome, LinearLayout.LayoutParams(
+            initialPageWidth, LinearLayout.LayoutParams.MATCH_PARENT
+        ))
+        pagerContent.addView(tabSearch, LinearLayout.LayoutParams(
+            initialPageWidth, LinearLayout.LayoutParams.MATCH_PARENT
+        ))
+        pagerContent.addView(tabProfile, LinearLayout.LayoutParams(
+            initialPageWidth, LinearLayout.LayoutParams.MATCH_PARENT
+        ))
+
+        pagerScroll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+            addView(pagerContent, HorizontalScrollView.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            ))
+        }
+        // Snap-to-nearest-page after the user lifts their finger or a fling settles.
+        pagerScroll.setOnTouchListener { _, event ->
+            if (event.action == MotionEvent.ACTION_UP ||
+                event.action == MotionEvent.ACTION_CANCEL) {
+                handler.postDelayed({ snapPager() }, 60)
+            }
+            false
+        }
+        // After layout: size each page to the actual pager width (not display width,
+        // which may include insets) and scroll to the restored tab.
+        pagerScroll.post {
+            val w = pagerScroll.width
+            if (w > 0) {
+                for (i in 0 until pagerContent.childCount) {
+                    pagerContent.getChildAt(i).layoutParams.width = w
+                }
+                pagerContent.requestLayout()
+                pagerScroll.scrollTo(currentTab * w, 0)
+            }
+        }
+
         val rootFrame = FrameLayout(this).apply { setBackgroundColor(COLOR_BG) }
         rootFrame.addView(
-            scroll,
-            FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-        )
-        tabHome = scroll
-
-        tabSearch = buildSearchContent()
-        rootFrame.addView(
-            tabSearch,
-            FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-        )
-        tabProfile = buildProfileContent()
-        rootFrame.addView(
-            tabProfile,
+            pagerScroll,
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -1083,14 +1118,42 @@ class MainActivity : Activity() {
     }
 
     private fun switchToTab(index: Int) {
-        currentTab = index
-        tabHome.visibility = if (index == 0) View.VISIBLE else View.GONE
-        tabSearch.visibility = if (index == 1) View.VISIBLE else View.GONE
-        tabProfile.visibility = if (index == 2) View.VISIBLE else View.GONE
-        // Re-tint nav buttons
+        currentTab = index.coerceIn(0, pagerContent.childCount - 1)
+        val w = pagerScroll.width
+        if (w > 0) {
+            pagerScroll.smoothScrollTo(currentTab * w, 0)
+        } else {
+            // Not laid out yet — the pagerScroll.post {} in buildUi will scroll.
+            pagerScroll.post { pagerScroll.scrollTo(currentTab * pagerScroll.width, 0) }
+        }
         tintNavTab(navHomeBtn, 0)
         tintNavTab(navSearchBtn, 1)
         tintNavTab(navProfileBtn, 2)
+    }
+
+    /**
+     * Called after the user's finger lifts: polls the scroll position, and once
+     * it has stopped changing (the fling has settled), smooth-scrolls to the
+     * nearest page and updates the bottom-nav active state.
+     */
+    private fun snapPager() {
+        val cur = pagerScroll.scrollX
+        if (cur == pagerLastScrollX) {
+            val w = pagerScroll.width
+            if (w <= 0) { pagerLastScrollX = -1; return }
+            val page = ((cur + w / 2) / w).coerceIn(0, pagerContent.childCount - 1)
+            pagerScroll.smoothScrollTo(page * w, 0)
+            if (page != currentTab) {
+                currentTab = page
+                tintNavTab(navHomeBtn, 0)
+                tintNavTab(navSearchBtn, 1)
+                tintNavTab(navProfileBtn, 2)
+            }
+            pagerLastScrollX = -1
+        } else {
+            pagerLastScrollX = cur
+            handler.postDelayed({ snapPager() }, 60)
+        }
     }
 
     private fun tintNavTab(btn: LinearLayout, index: Int) {
