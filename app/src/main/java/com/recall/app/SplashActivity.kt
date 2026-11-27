@@ -40,7 +40,7 @@ class SplashActivity : Activity() {
             setImageResource(R.drawable.ic_launcher_foreground)
             background = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-                setColor(0xFF1D9BF0.toInt())
+                setColor(0xFF0A0A0A.toInt())
                 cornerRadius = dp(26).toFloat()
             }
             layoutParams = LinearLayout.LayoutParams(dp(130), dp(130))

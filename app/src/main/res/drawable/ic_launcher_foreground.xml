@@ -4,28 +4,17 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Bold rounded R on the left -->
+    <!-- Equalizer bars on the left: 5 thin white bars of varying heights -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8,48 h3 v12 h-3 z M14,38 h3 v32 h-3 z M20,42 h3 v24 h-3 z M26,33 h3 v42 h-3 z M32,45 h3 v18 h-3 z" />
+    <!-- Bold rounded R, positioned center-right so the equalizer sits beside it -->
     <path
         android:fillColor="#FFFFFF"
         android:fillType="evenOdd"
-        android:pathData="M20,25 L47,25 C58,25 64,33 64,43 C64,51 59,58 50,60 L63,85 L52,85 L40,60 L33,60 L33,85 L20,85 Z M33,36 L45,36 C50,36 53,39 53,43 C53,47 50,49 45,49 L33,49 Z" />
-    <!-- Three concentric sound-wave arcs on the right of the R -->
+        android:pathData="M40,25 L67,25 C78,25 84,33 84,43 C84,51 79,58 70,60 L83,85 L72,85 L60,60 L53,60 L53,85 L40,85 Z M53,36 L65,36 C70,36 73,39 73,43 C73,47 70,49 65,49 L53,49 Z" />
+    <!-- Red record dot at the top-right of the R -->
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:strokeLineCap="round"
-        android:pathData="M74,50 A5,5 0 0 1 74,60" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:strokeLineCap="round"
-        android:pathData="M74,45 A10,10 0 0 1 74,65" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:strokeLineCap="round"
-        android:pathData="M74,40 A15,15 0 0 1 74,70" />
+        android:fillColor="#E53935"
+        android:pathData="M79,26 A4,4 0 1 0 79,34 A4,4 0 1 0 79,26 Z" />
 </vector>
