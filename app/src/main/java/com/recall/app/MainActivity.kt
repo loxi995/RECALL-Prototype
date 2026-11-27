@@ -70,6 +70,8 @@ class MainActivity : Activity() {
     private lateinit var buyBtn: Button
     private lateinit var bufferTitleText: TextView
     private lateinit var bufferSubText: TextView
+    private lateinit var alertsTitleText: TextView
+    private lateinit var alertsSubText: TextView
 
     private var player: MediaPlayer? = null
     private var playState = PlayState.IDLE
@@ -91,6 +93,8 @@ class MainActivity : Activity() {
         buildUi()
         updateBalance()
         updateBuffer()
+        updateAlerts()
+        WatchdogScheduler.ensureSchedules(this)
         if (!prefs.getBoolean(KEY_TERMS, false)) {
             showDisclosure()
         } else {
@@ -342,6 +346,61 @@ class MainActivity : Activity() {
             setPadding(dp(10), 0, dp(2), 0)
         })
         root.addView(bufferCard, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = dp(16) })
+
+        // Alerts card — event-based notifications (watchdog + weekly check-in)
+        val alertsCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(Color.TRANSPARENT)
+                setStroke(dp(1), COLOR_DIVIDER)
+                cornerRadius = dp(16).toFloat()
+            }
+            setPadding(dp(18), dp(14), dp(14), dp(14))
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { showAlertsPicker() }
+        }
+        val alertsCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+            )
+        }
+        alertsCol.addView(TextView(this).apply {
+            text = "ALERTS"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT_MUTED)
+            letterSpacing = 0.14f
+            setPadding(0, 0, 0, dp(4))
+        })
+        alertsTitleText = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+        }
+        alertsCol.addView(alertsTitleText)
+        alertsSubText = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setPadding(0, dp(2), 0, 0)
+        }
+        alertsCol.addView(alertsSubText)
+        alertsCard.addView(alertsCol)
+        alertsCard.addView(TextView(this).apply {
+            text = "CHANGE ▸"
+            setTextColor(COLOR_ACCENT)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            letterSpacing = 0.14f
+            setPadding(dp(10), 0, dp(2), 0)
+        })
+        root.addView(alertsCard, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply { bottomMargin = dp(20) })
@@ -1115,6 +1174,9 @@ class MainActivity : Activity() {
     private fun onSwitchChanged(btn: CompoundButton, checked: Boolean) {
         if (checked) {
             prefs.edit().putBoolean(KEY_ENABLED, true).apply()
+            // Re-enabling clears the "intentionally off" timer so the weekly
+            // check-in won't fire for an off-period that has ended.
+            WatchdogScheduler.clearDisabled(this)
             if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                 startCaptureService()
             } else {
@@ -1161,6 +1223,9 @@ class MainActivity : Activity() {
 
         val off = dangerBtn("Turn off") {
             prefs.edit().putBoolean(KEY_ENABLED, false).apply()
+            // Start the weekly-check-in clock from now so the alert (if opted in)
+            // only nudges the user after 7 full days off.
+            WatchdogScheduler.recordDisabled(this)
             stopCaptureService()
             setSwitchSilently(false)
             updateStatus()
@@ -1270,6 +1335,150 @@ class MainActivity : Activity() {
             tier.hours == Billing.BUFFER_TIERS[0].hours -> "Default · tap to extend further"
             else -> "Extended · tap to change"
         }
+    }
+
+    private fun updateAlerts() {
+        val watchdog = WatchdogScheduler.watchdogEnabled(this)
+        val weekly = WatchdogScheduler.weeklyEnabled(this)
+        alertsTitleText.text = when {
+            watchdog && weekly -> "Watchdog + Weekly"
+            watchdog -> "Watchdog on"
+            weekly -> "Weekly check-in"
+            else -> "All silent"
+        }
+        alertsSubText.text = when {
+            watchdog && weekly -> "Covers outages + long-off nudge"
+            watchdog -> "Pings you only if RECALL stops unexpectedly"
+            weekly -> "Weekly nudge if listening is off"
+            else -> "No alerts — tap to configure"
+        }
+    }
+
+    private fun showAlertsPicker() {
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(22), dp(20), dp(16))
+        }
+        content.addView(TextView(this).apply {
+            text = "ALERTS"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+            letterSpacing = 0.1f
+            setPadding(0, 0, 0, dp(4))
+        })
+        content.addView(TextView(this).apply {
+            text = "RECALL only notifies you when something actually goes wrong — never \"come back and use the app\" nags."
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setPadding(0, 0, 0, dp(18))
+            setLineSpacing(dp(2).toFloat(), 1f)
+        })
+
+        content.addView(alertSwitchRow(
+            title = "Watchdog alert",
+            body = "Notify me immediately if RECALL stops listening (OS killed the service, background limit hit, etc.).",
+            checked = WatchdogScheduler.watchdogEnabled(this),
+            onChange = { on ->
+                WatchdogScheduler.setWatchdogEnabled(this, on)
+                updateAlerts()
+            }
+        ))
+        content.addView(alertSwitchRow(
+            title = "Weekly check-in",
+            body = "If I've had RECALL off for 7 days, nudge me once to turn it back on.",
+            checked = WatchdogScheduler.weeklyEnabled(this),
+            onChange = { on ->
+                WatchdogScheduler.setWeeklyEnabled(this, on)
+                updateAlerts()
+            }
+        ))
+
+        var dlgRef: Dialog? = null
+        val closeRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+            setPadding(0, dp(6), 0, 0)
+        }
+        closeRow.addView(TextView(this).apply {
+            text = "DONE"
+            setTextColor(COLOR_ACCENT)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            letterSpacing = 0.14f
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            isClickable = true
+            isFocusable = true
+            background = RippleDrawable(
+                ColorStateList.valueOf(COLOR_BTN_SECONDARY_RIPPLE), null, null
+            )
+            setOnClickListener { dlgRef?.dismiss() }
+        })
+        content.addView(closeRow)
+
+        val scroll = ScrollView(this).apply { addView(content) }
+        dlgRef = styledDialog(scroll)
+        dlgRef.show()
+    }
+
+    private fun alertSwitchRow(
+        title: String,
+        body: String,
+        checked: Boolean,
+        onChange: (Boolean) -> Unit
+    ): View {
+        val wrapper = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(10) }
+        }
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(12), dp(10), dp(12))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(Color.TRANSPARENT)
+                setStroke(dp(1), COLOR_DIVIDER)
+                cornerRadius = dp(14).toFloat()
+            }
+        }
+        val col = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+            )
+        }
+        col.addView(TextView(this).apply {
+            text = title
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+        })
+        col.addView(TextView(this).apply {
+            text = body
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setLineSpacing(dp(2).toFloat(), 1f)
+            setPadding(0, dp(2), 0, 0)
+        })
+        row.addView(col)
+        row.addView(Switch(this).apply {
+            isChecked = checked
+            thumbTintList = ColorStateList.valueOf(Color.WHITE)
+            trackTintList = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(COLOR_ACCENT, 0xFF4A4A4A.toInt())
+            )
+            setOnCheckedChangeListener { _, v -> onChange(v) }
+        }, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { marginStart = dp(10) })
+        wrapper.addView(row)
+        return wrapper
     }
 
     private fun formatBufferHours(hours: Int): String = when {

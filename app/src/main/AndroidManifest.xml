@@ -44,5 +44,14 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+        <receiver
+            android:name=".WatchdogReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.recall.app.WATCHDOG_TICK" />
+                <action android:name="com.recall.app.WEEKLY_TICK" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

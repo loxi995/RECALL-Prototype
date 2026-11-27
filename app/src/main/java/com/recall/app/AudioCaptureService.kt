@@ -85,6 +85,8 @@ class AudioCaptureService : Service() {
         chunksDir().mkdirs()
         recording = true
         isRunning = true
+        WatchdogScheduler.ensureSchedules(this)
+        WatchdogScheduler.recordHeartbeat(this)
         rotateChunk(reason = "start")
     }
 
@@ -120,6 +122,8 @@ class AudioCaptureService : Service() {
         }
 
         cleanupOldChunks()
+        // Watchdog uses this to detect whether the service has died silently.
+        WatchdogScheduler.recordHeartbeat(this)
         rotateHandler.postDelayed(rotateRunnable, CHUNK_MS)
     }
 

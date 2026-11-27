@@ -14,6 +14,11 @@ class BootReceiver : BroadcastReceiver() {
 
         val prefs = context.getSharedPreferences("recall_prefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("accepted_terms", false)) return
+
+        // Reboots clear AlarmManager entries — re-register the watchdog + weekly
+        // check-in before anything else so they survive the restart.
+        WatchdogScheduler.ensureSchedules(context)
+
         if (!prefs.getBoolean("enabled", true)) return
 
         val serviceIntent = Intent(context, AudioCaptureService::class.java)
