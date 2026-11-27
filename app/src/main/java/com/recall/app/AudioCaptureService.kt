@@ -320,6 +320,100 @@ class AudioCaptureService : Service() {
             return (pcmBytes.size / bytesPerSec).coerceAtMost(maxSeconds(context))
         }
 
+        /**
+         * Export a specific time window of audio as a WAV file to [output].
+         *
+         * [startMs] / [endMs] are UTC epoch milliseconds — the UI converts
+         * from the user's local-time pick before calling this, so chunk-side
+         * logic stays timezone-agnostic.
+         *
+         * Returns the actual number of seconds written (0 if no audio exists
+         * in the requested range).
+         */
+        fun exportTimeRange(
+            context: Context,
+            startMs: Long,
+            endMs: Long,
+            output: File
+        ): Int {
+            instance?.forceRotateForExport()
+            if (endMs <= startMs) return 0
+
+            val chunks = listChunks(context)
+            if (chunks.isEmpty()) return 0
+
+            // Clip the requested window to what the buffer actually holds.
+            val now = System.currentTimeMillis()
+            val oldest = chunks.first().startMs
+            val effectiveStart = maxOf(startMs, oldest)
+            val effectiveEnd = minOf(endMs, now)
+            if (effectiveEnd <= effectiveStart) return 0
+
+            // Each chunk covers [chunk.startMs, nextChunk.startMs). The last
+            // relevant chunk is open-ended on the right (bounded only by now).
+            data class ChunkSpan(val info: ChunkInfo, val chunkEndMs: Long)
+            val spans = mutableListOf<ChunkSpan>()
+            for (i in chunks.indices) {
+                val c = chunks[i]
+                val chunkEndMs = chunks.getOrNull(i + 1)?.startMs ?: Long.MAX_VALUE
+                if (c.startMs < effectiveEnd && chunkEndMs > effectiveStart) {
+                    spans.add(ChunkSpan(c, chunkEndMs))
+                }
+            }
+            if (spans.isEmpty()) return 0
+
+            var outputSampleRate = 0
+            var outputChannels = 0
+            val pcmBuffer = ByteArrayOutputStream()
+
+            for (span in spans) {
+                val wantStartInChunkMs =
+                    maxOf(0L, effectiveStart - span.info.startMs)
+                val wantEndInChunkMs =
+                    minOf(span.chunkEndMs, effectiveEnd) - span.info.startMs
+                if (wantEndInChunkMs <= wantStartInChunkMs) continue
+
+                val decoded = try {
+                    decodeOggOpusToPcm(span.info.file, wantStartInChunkMs)
+                } catch (e: Exception) {
+                    Log.e(TAG, "decode ${span.info.file.name} failed", e); null
+                } ?: continue
+
+                if (outputSampleRate == 0) {
+                    outputSampleRate = decoded.sampleRate
+                    outputChannels = decoded.channels
+                }
+
+                // Trim the tail if this chunk extends past the requested end.
+                val wantDurationMs = wantEndInChunkMs - wantStartInChunkMs
+                val wantBytes = (wantDurationMs * outputSampleRate / 1000L *
+                    outputChannels * 2).toInt().coerceAtLeast(0)
+                val slice = if (decoded.pcm.size > wantBytes) {
+                    decoded.pcm.copyOfRange(0, wantBytes)
+                } else {
+                    decoded.pcm
+                }
+                pcmBuffer.write(slice)
+            }
+
+            val pcmBytes = pcmBuffer.toByteArray()
+            if (pcmBytes.isEmpty() || outputSampleRate == 0) return 0
+
+            try {
+                output.parentFile?.mkdirs()
+                output.outputStream().use { out ->
+                    out.write(wavHeader(pcmBytes.size, outputSampleRate, outputChannels))
+                    out.write(pcmBytes)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "WAV write failed", e)
+                return 0
+            }
+
+            val bytesPerSec = outputSampleRate * outputChannels * 2
+            return pcmBytes.size / bytesPerSec
+        }
+
         private data class ChunkInfo(val file: File, val startMs: Long)
 
         private fun listChunks(context: Context): List<ChunkInfo> {

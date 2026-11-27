@@ -4,7 +4,9 @@ import android.Manifest
 import android.animation.ObjectAnimator
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.DatePickerDialog
 import android.app.Dialog
+import android.app.TimePickerDialog
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -47,6 +49,7 @@ import android.widget.TextView
 import android.widget.Toast
 import java.io.File
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -420,6 +423,9 @@ class MainActivity : Activity() {
         root.addView(recoverBtn, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, dp(56)
         ).apply { topMargin = dp(16) })
+
+        // Alternate flow: pick an explicit start / end time instead of "last N"
+        root.addView(secondaryBtn("OR PICK A SPECIFIC TIME RANGE") { showTimeRangePicker() })
 
         // Playback (state-aware)
         playBtn = secondaryBtn("PLAY LAST RECOVERY") { togglePlayRecovery() }
@@ -1809,6 +1815,214 @@ class MainActivity : Activity() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "recovery failed", e)
+            Toast.makeText(this, "Recovery failed: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    /**
+     * Picker for the "recover by specific time range" flow. Uses the user's
+     * device-local timezone for display; chunk logic stays in UTC epoch.
+     */
+    private fun showTimeRangePicker() {
+        val now = System.currentTimeMillis()
+        val bufferHrs = AudioCaptureService.bufferHours(this)
+        val oldestAvailableMs = now - bufferHrs * 3600L * 1000L
+        // Sensible default: last 15 minutes
+        var startMs = now - 15 * 60 * 1000L
+        var endMs = now
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(22), dp(20), dp(16))
+        }
+        content.addView(TextView(this).apply {
+            text = "RECOVER TIME RANGE"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT)
+            letterSpacing = 0.1f
+            setPadding(0, 0, 0, dp(4))
+        })
+        content.addView(TextView(this).apply {
+            text = "Pick the exact time window the audio you want is from. Times are in your local timezone."
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setLineSpacing(dp(2).toFloat(), 1f)
+            setPadding(0, 0, 0, dp(18))
+        })
+
+        content.addView(TextView(this).apply {
+            text = "START"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT_MUTED)
+            letterSpacing = 0.14f
+            setPadding(0, 0, 0, dp(6))
+        })
+        val startBtn = secondaryBtn(formatDateTime(startMs)) { }
+        content.addView(startBtn)
+
+        content.addView(TextView(this).apply {
+            text = "END"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(COLOR_TEXT_MUTED)
+            letterSpacing = 0.14f
+            setPadding(0, dp(12), 0, dp(6))
+        })
+        val endBtn = secondaryBtn(formatDateTime(endMs)) { }
+        content.addView(endBtn)
+
+        val summary = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setTextColor(COLOR_TEXT_MUTED)
+            setLineSpacing(dp(2).toFloat(), 1f)
+            setPadding(0, dp(16), 0, dp(4))
+        }
+        content.addView(summary)
+
+        fun refreshSummary() {
+            startBtn.text = formatDateTime(startMs)
+            endBtn.text = formatDateTime(endMs)
+            val durSec = ((endMs - startMs) / 1000L).toInt()
+            summary.text = when {
+                endMs <= startMs -> "End must be after start."
+                startMs < oldestAvailableMs ->
+                    "Start is beyond the buffer window (${formatBufferHours(bufferHrs)}). " +
+                        "The recovery will include only what's still on-device."
+                endMs > now ->
+                    "End is in the future — clamped to right now."
+                durSec < 30 ->
+                    "Pick at least 30 seconds."
+                else ->
+                    "Duration: ${formatDuration(durSec)} · Costs ${formatDuration(durSec)} from balance."
+            }
+            summary.setTextColor(
+                when {
+                    endMs <= startMs -> 0xFFFF6B6B.toInt()
+                    durSec < 30 -> 0xFFFF6B6B.toInt()
+                    else -> COLOR_TEXT_MUTED
+                }
+            )
+        }
+        refreshSummary()
+
+        startBtn.setOnClickListener {
+            pickDateTime(startMs) { newMs ->
+                startMs = newMs
+                refreshSummary()
+            }
+        }
+        endBtn.setOnClickListener {
+            pickDateTime(endMs) { newMs ->
+                endMs = newMs
+                refreshSummary()
+            }
+        }
+
+        var dlgRef: Dialog? = null
+        val recoverBtn = primaryBtn("RECOVER THIS RANGE") {
+            if (endMs <= startMs || (endMs - startMs) < 30_000L) {
+                Toast.makeText(
+                    this,
+                    "Pick a range of at least 30 seconds with end after start.",
+                    Toast.LENGTH_SHORT
+                ).show()
+                return@primaryBtn
+            }
+            dlgRef?.dismiss()
+            recoverFromRange(startMs, endMs)
+        }
+        recoverBtn.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, dp(54)
+        ).apply { topMargin = dp(16) }
+        content.addView(recoverBtn)
+
+        val cancelBtn = secondaryBtn("Cancel") { dlgRef?.dismiss() }
+        cancelBtn.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, dp(48)
+        ).apply { topMargin = dp(10) }
+        content.addView(cancelBtn)
+
+        val scroll = ScrollView(this).apply { addView(content) }
+        dlgRef = styledDialog(scroll)
+        dlgRef.show()
+    }
+
+    /** Opens system Date then Time pickers; returns the combined UTC epoch. */
+    private fun pickDateTime(initialMs: Long, onPick: (Long) -> Unit) {
+        val cal = Calendar.getInstance().apply { timeInMillis = initialMs }
+        DatePickerDialog(
+            this,
+            { _, year, month, day ->
+                cal.set(Calendar.YEAR, year)
+                cal.set(Calendar.MONTH, month)
+                cal.set(Calendar.DAY_OF_MONTH, day)
+                TimePickerDialog(
+                    this,
+                    { _, hour, min ->
+                        cal.set(Calendar.HOUR_OF_DAY, hour)
+                        cal.set(Calendar.MINUTE, min)
+                        cal.set(Calendar.SECOND, 0)
+                        cal.set(Calendar.MILLISECOND, 0)
+                        onPick(cal.timeInMillis)
+                    },
+                    cal.get(Calendar.HOUR_OF_DAY),
+                    cal.get(Calendar.MINUTE),
+                    false
+                ).show()
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    private fun formatDateTime(ms: Long): String {
+        val sdf = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
+        return sdf.format(Date(ms))
+    }
+
+    private fun recoverFromRange(startMs: Long, endMs: Long) {
+        val durationSec = ((endMs - startMs) / 1000L).toInt()
+        if (durationSec < 30) {
+            Toast.makeText(this, "Range must be at least 30 seconds.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!Billing.canCover(this, durationSec)) {
+            val have = Billing.effectiveSec(this)
+            Toast.makeText(
+                this,
+                "Need ${formatDuration(durationSec)} of minutes — you have ${formatDuration(have)}.",
+                Toast.LENGTH_LONG
+            ).show()
+            showPackPicker()
+            return
+        }
+        try {
+            val out = File(getExternalFilesDir(null), "recall-recovery.wav")
+            val got = AudioCaptureService.exportTimeRange(this, startMs, endMs, out)
+            if (got > 0) {
+                Billing.deduct(this, got)
+                updateBalance()
+                Toast.makeText(
+                    this,
+                    "Recovered ${formatDuration(got)} from ${formatDateTime(startMs)}.",
+                    Toast.LENGTH_LONG
+                ).show()
+                player?.release()
+                player = null
+                playState = PlayState.IDLE
+                updatePlayButton()
+            } else {
+                Toast.makeText(
+                    this,
+                    "No audio available for that range — it may be older than your buffer window.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "range recovery failed", e)
             Toast.makeText(this, "Recovery failed: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
