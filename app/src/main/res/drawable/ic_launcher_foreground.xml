@@ -4,8 +4,28 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Bold rounded R on the left -->
     <path
         android:fillColor="#FFFFFF"
         android:fillType="evenOdd"
-        android:pathData="M35,31 L63,31 L74,34 L79,42 L79,51 L74,57 L65,60 L81,81 L68,81 L53,60 L45,60 L45,81 L35,81 Z M45,39 L58,39 L67,46 L58,52 L45,52 L52,46 Z" />
+        android:pathData="M20,25 L47,25 C58,25 64,33 64,43 C64,51 59,58 50,60 L63,85 L52,85 L40,60 L33,60 L33,85 L20,85 Z M33,36 L45,36 C50,36 53,39 53,43 C53,47 50,49 45,49 L33,49 Z" />
+    <!-- Three concentric sound-wave arcs on the right of the R -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M74,50 A5,5 0 0 1 74,60" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M74,45 A10,10 0 0 1 74,65" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M74,40 A15,15 0 0 1 74,70" />
 </vector>
