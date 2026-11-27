@@ -148,8 +148,31 @@ class MainActivity : Activity() {
     /** Translates [en] to the active language. English keys passed through unchanged. */
     private fun t(en: String): String = Strings.t(this, en)
 
+    /**
+     * Writes any uncaught crash to the app's external files directory so we
+     * can pull it later. Never silences the crash — the system's crash dialog
+     * still appears, and the default handler is called after we log.
+     */
+    private fun installCrashHandler() {
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                val dir = getExternalFilesDir(null)
+                if (dir != null) {
+                    val f = java.io.File(dir, "recall-crash.txt")
+                    val header = "Crashed at ${java.util.Date()}\n" +
+                        "Thread: ${thread.name}\n" +
+                        "Version: ${packageManager.getPackageInfo(packageName, 0).versionName}\n\n"
+                    f.writeText(header + throwable.stackTraceToString())
+                }
+            } catch (_: Throwable) {}
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        installCrashHandler()
         prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         currentTab = savedInstanceState?.getInt(STATE_CURRENT_TAB, 0) ?: 0
         Billing.ensureInit(this)
@@ -1300,8 +1323,9 @@ class MainActivity : Activity() {
                 intArrayOf(COLOR_ACCENT, 0xFF4A4A4A.toInt())
             )
             setOnCheckedChangeListener { _, checked ->
+                if (checked == isDarkTheme()) return@setOnCheckedChangeListener
                 prefs.edit().putBoolean(KEY_DARK_THEME, checked).apply()
-                recreate()
+                handler.post { recreate() }
             }
         }, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -1359,11 +1383,15 @@ class MainActivity : Activity() {
                 intArrayOf(COLOR_ACCENT, 0xFF4A4A4A.toInt())
             )
             setOnCheckedChangeListener { _, checked ->
+                val wantAr = checked
+                if (wantAr == Strings.isArabic(this@MainActivity)) {
+                    return@setOnCheckedChangeListener
+                }
                 Strings.setLang(
                     this@MainActivity,
-                    if (checked) Strings.LANG_AR else Strings.LANG_EN
+                    if (wantAr) Strings.LANG_AR else Strings.LANG_EN
                 )
-                recreate()
+                handler.post { recreate() }
             }
         }, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,
